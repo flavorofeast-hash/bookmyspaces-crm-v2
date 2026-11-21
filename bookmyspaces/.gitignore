@@ -48,3 +48,4 @@ deployed_route.txt
 
 *.zip
 .env.local.20260603.backup
+test-artifacts/

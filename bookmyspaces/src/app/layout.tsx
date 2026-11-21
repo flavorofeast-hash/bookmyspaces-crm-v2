@@ -1,23 +1,13 @@
-import type { Metadata } from 'next'
 import './globals.css'
-import { Toaster } from 'sonner'
+import type { Metadata, Viewport } from 'next'
 
-export const metadata: Metadata = {
-  title: 'BookMySpaces CRM',
-  description: 'AI-powered hospitality CRM',
-}
+export const metadata: Metadata = { title: 'BookMySpaces CRM', robots: 'noindex, nofollow' }
+export const viewport: Viewport = { width: 'device-width', initialScale: 1 }
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>
-        {children}
-        <Toaster position="top-right" richColors />
-      </body>
+    <html lang="en-IN">
+      <body>{children}</body>
     </html>
   )
 }
