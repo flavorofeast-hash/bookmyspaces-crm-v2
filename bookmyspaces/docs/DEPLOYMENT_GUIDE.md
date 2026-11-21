@@ -3,7 +3,7 @@
 Prepared 22 Nov 2026. Live V3 is untouched. Nothing below changes production until **Part D**, and each step there needs your approval.
 
 ## Facts this guide relies on (checked 22 Nov 2026)
-- GitHub `main` = `fc46825` (live V3). Branch `simplify` = `3f09ab7` (v2), built on `main`, changes only `bookmyspaces/` and `archive/`.
+- GitHub `main` = `fc46825` (live V3). Branch `simplify` (v2, tip commit "Deployment guide v1 (final prep commit)"), built on `main`, changes only `bookmyspaces/` and `archive/`.
 - Vercel deploys this repo automatically through its GitHub app (`vercel[bot]` created every past deployment). Only `main` goes to **Production**; any other branch pushed becomes a **Preview** deployment.
 - Vercel team: `raju1605jobs-hashs-projects`, project `bookmyspaces-crm-v2`, region `bom1`. The app lives in the `bookmyspaces/` folder (same as V3, so the Root Directory setting needs no change).
 - A clean install (`npm ci`) and production build of `simplify` succeed with no environment variables. Without `CRM_DATABASE_URL` the site only shows setup instructions and refuses webhooks (HTTP 503).
@@ -16,7 +16,7 @@ Run on your computer, in `Desktop\BookMySpaces_CRM_v2_Final\NEW_CRM_v2` (PowerSh
 git clone bookmyspaces-crm-v2_with-simplify-branch.bundle crm-v2
 cd crm-v2
 git checkout simplify
-git log --oneline -1                      # must show 3f09ab7
+git log --oneline -1                      # must show "Deployment guide v1 (final prep commit)"
 git remote set-url origin https://github.com/raju1605jobs-hash/bookmyspaces-crm-v2.git
 git fetch origin main
 git merge-base --is-ancestor origin/main simplify && echo "OK: simplify is built on the current main"
