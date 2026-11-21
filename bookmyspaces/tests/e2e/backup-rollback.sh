@@ -7,6 +7,15 @@ P="psql -h /tmp -p 5433 -U postgres -qtA"
 pass() { echo "PASS $*"; }; fail() { echo "FAIL $*"; exit 1; }
 $P -c "DROP DATABASE IF EXISTS prod_sim" -c "DROP DATABASE IF EXISTS prod_restore" -c "CREATE DATABASE prod_sim" -c "CREATE DATABASE prod_restore"
 $P -d prod_sim <<'SQL'
+-- Supabase-like setup: extensions schema and API roles with broad default grants on public
+CREATE SCHEMA IF NOT EXISTS extensions;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role NOLOGIN; END IF;
+END $$;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
 CREATE TABLE public.leads (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), created_at timestamptz DEFAULT now(), name text, phone text, email text, event_type text, event_date date, guest_count int, budget text, special_requirements text, venue text, status text, source text, notes text, followup_date timestamptz, inquiry_summary text, lead_score int DEFAULT 5, tags text[] DEFAULT '{}');
 INSERT INTO public.leads (name, phone, email, event_type, guest_count, source, notes)
   SELECT CASE WHEN g % 20 = 0 THEN NULL ELSE 'Legacy Lead ' || g END, CASE WHEN g % 13 = 0 THEN NULL WHEN g % 9 = 0 THEN '+91 9100000001' ELSE '91000' || (10000 + g) END,
@@ -39,6 +48,10 @@ BEFORE=$(fingerprint prod_sim)
 export CRM_DATABASE_URL='postgresql://postgres@localhost:5433/prod_sim?host=/tmp'
 npm run -s db:migrate
 npm run -s db:migrate | grep -q "already up to date" && pass "2a. Migration applied; re-running is a no-op"
+EXT=$($P -d prod_sim -c "SELECT n.nspname FROM pg_extension e JOIN pg_namespace n ON n.oid = e.extnamespace WHERE extname = 'btree_gist'")
+[ "$EXT" = "extensions" ] && pass "2c. Double-booking extension installed in Supabase's extensions schema" || fail "btree_gist in $EXT"
+DENIED=$($P -d prod_sim -c "SET ROLE anon; SELECT count(*) FROM crm.customers" 2>&1 | grep -c "permission denied" || true)
+[ "$DENIED" = "1" ] && pass "2d. Supabase public role (anon) is refused access to CRM tables" || fail "anon could read crm"
 [ "$(fingerprint prod_sim)" = "$BEFORE" ] && pass "2b. All legacy tables byte-for-byte unchanged after migration (including same-named payments/messages/campaigns/packages/properties)" || fail "legacy changed"
 
 # 3. Import the 82 leads
@@ -46,6 +59,10 @@ npm run -s db:import-leads > /tmp/import.out
 grep -q "found: 82" /tmp/import.out && pass "3a. Import found 82 leads: $(tr -d '\n' < /tmp/import.out | tr -s ' ')"
 N=$($P -d prod_sim -c "SELECT count(*) FROM (SELECT unnest(legacy_lead_ids) FROM crm.customers) x")
 [ "$N" = "82" ] && pass "3b. Every one of the 82 original lead IDs is linked to a customer" || fail "only $N linked"
+C1=$($P -d prod_sim -c "SELECT count(*) FROM crm.customers")
+npm run -s db:import-leads > /tmp/import2.out
+C2=$($P -d prod_sim -c "SELECT count(*) FROM crm.customers")
+grep -q "skipped: 82" /tmp/import2.out && [ "$C1" = "$C2" ] && pass "3d. Second import: 82 skipped, customer count unchanged ($C2) — no duplicates" || fail "re-import changed data"
 [ "$(fingerprint prod_sim)" = "$BEFORE" ] && pass "3c. Legacy leads table untouched by the import" || fail "import changed legacy"
 
 # 4. Rollback
