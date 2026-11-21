@@ -97,7 +97,7 @@ Test first with a separate **Meta test app and test number**, with its webhook s
 ```
 npm install
 npm run dev                 # needs CRM_DATABASE_URL + SESSION_SECRET
-npm test                    # 56 integration tests against a real Postgres (TEST_DATABASE_URL)
+npm test                    # 66 integration tests against a real Postgres (TEST_DATABASE_URL)
 npm run db:migrate          # apply db/migrations to CRM_DATABASE_URL
 npm run db:import-leads     # same as Settings → Import old leads
 npm run db:create-owner -- "Name" email 'password'

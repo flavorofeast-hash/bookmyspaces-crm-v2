@@ -1,31 +1,35 @@
 # BookMySpaces CRM v2 — Test Report
 
-Run: 21 Nov 2026, test environment (local PostgreSQL 16 + production build of the app + Chrome). Every test listed was actually executed; nothing is reported as passed without running.
+Run: 22 Nov 2026 on commit 3f09ab7, in a separate test environment (local PostgreSQL 16 with Supabase-style roles and `extensions` schema, production build, real Chrome). Every test listed was executed in this run. Nothing touched production.
 
 | Suite | Result |
 |---|---|
-| Integration tests (business rules against a real database) | 56 / 56 passed |
-| Browser acceptance test (real Chrome, real screens) | 32 / 32 passed |
-| Backup / migration / rollback / restore drill | 9 / 9 passed |
-| Type check (tsc) and production build | clean |
-| Dependency security audit (npm audit, production) | 0 known vulnerabilities |
+| Integration tests (real database) | 66 / 66 passed |
+| Browser acceptance test (real Chrome) | 32 / 32 passed |
+| Supabase-like migration, 82-lead import, rollback, restore drill | 12 / 12 passed |
+| Clean Vercel-style build (`npm ci` + `next build`, no env vars) | passed; site shows setup page, webhook refuses (503) |
+| Type check and dependency audit | clean; 0 known vulnerabilities |
 
-## What was NOT tested against the real services (and why)
+## Genuinely functional vs simulated
 
-- **Real Meta WhatsApp / Facebook / Instagram**: no access to a Meta test app or tokens in this session. These were tested against a local stand-in for graph.facebook.com that returns Meta-shaped success and error responses, and with real HMAC-signed webhook payloads. Final confirmation needs one live test (see the delivery report).
-- **Real Supabase**: no Supabase access (the dashboard is not signed in, and no credentials were available). The migration was tested on PostgreSQL 16 with a Supabase-style `extensions` schema and a simulated copy of the legacy production tables.
-- **Vercel deployment**: no deploy access (GitHub push was not permitted for this session).
+| Feature | Status |
+|---|---|
+| Login, sessions, permissions, customers, bookings, availability, double-booking block, billing, refunds, numbering, documents, Today, Settings, lead import | **Functional** — tested end to end against a real database |
+| WhatsApp receive/send/status | **Code complete; tested against a simulated Meta API** (real signed webhooks). Needs one live test with a Meta test app |
+| Facebook / Instagram publishing | **Code complete; tested against a simulated Meta API**. Needs your Page token for a live test |
+| Google Business | **Manual** copy-and-post (functional); automatic posting awaits Google API approval |
+| Production database backup | **Not verified** — no Supabase login available to Claude |
 
-## Browser acceptance test (owner’s acceptance list)
+## Browser acceptance test
 
 | # | Step | Result | Detail |
 |---|---|---|---|
 | 1 | Logged-out visitor is sent to login (all six modules) | PASS |  |
 | 2 | 1. Log in (wrong password refused, right password accepted) | PASS |  |
 | 3 | Today shows check-ins, events, follow-ups, balances, activity | PASS |  |
-| 4 | 2. Add a customer | PASS | /customers/6ca4e056-cd6f-4693-a1ae-6dba26b254e9 |
+| 4 | 2. Add a customer | PASS | /customers/946d762e-d367-4298-bbc4-df25a17dfe5c |
 | 5 | Duplicate detection (same mobile typed differently) | PASS |  |
-| 6 | 3. Record an enquiry from the customer (hall, evening slot) | PASS | /bookings/054d8760-a60d-44a0-818a-3b811e953733 |
+| 6 | 3. Record an enquiry from the customer (hall, evening slot) | PASS | /bookings/44f22400-46f0-4adf-9e90-3fdbc9aa2954 |
 | 7 | Second customer enquires for the same hall and time (tentative allowed) | PASS |  |
 | 8 | 4/5. Convert enquiry into a confirmed booking (availability checked) | PASS |  |
 | 9 | 6. Double booking is prevented (database refuses, UI explains who holds it) | PASS |  |
@@ -52,8 +56,6 @@ Run: 21 Nov 2026, test environment (local PostgreSQL 16 + production build of th
 | 30 | Mobile layout (375×812): Today, booking, customer, inbox | PASS |  |
 | 31 | Data persists after restart-equivalent (fresh session reads same records) | PASS |  |
 | 32 | Public customer document link works without login | PASS |  |
-
-Screenshots of each step: `test-artifacts/*.png` (also delivered with this report).
 
 ## Integration tests
 
@@ -106,6 +108,16 @@ Screenshots of each step: `test-artifacts/*.png` (also delivered with this repor
 | content and publishing | Google Business: manual posting is recorded as posted manually | PASS |
 | login security | hashes and verifies passwords | PASS |
 | login security | session tokens: valid, tampered, expired | PASS |
+| login and sessions | logs in with the right password and sets a signed, httpOnly-style session cookie | PASS |
+| login and sessions | refuses a wrong password with a message that does not reveal whether the email exists | PASS |
+| login and sessions | locks an email after 10 failures in 15 minutes, even if the 11th password is right | PASS |
+| login and sessions | a forged or tampered cookie is not accepted | PASS |
+| login and sessions | changing a password signs out existing sessions | PASS |
+| login and sessions | a deactivated user is signed out and cannot log in; the last owner cannot be deactivated | PASS |
+| login and sessions | staff are refused owner-only actions on the server | PASS |
+| login and sessions | passwords are stored only as salted scrypt hashes | PASS |
+| database permissions (Supabase roles) | anon and authenticated roles cannot read or write any CRM table, even with Supabase-style default grants | PASS |
+| database permissions (Supabase roles) | the server connection (table owner) still works normally | PASS |
 | phone normalisation | normalises Indian numbers in every common format to 91XXXXXXXXXX | PASS |
 | customers | creates a customer with normalised phone and WhatsApp defaulting to phone | PASS |
 | customers | detects a duplicate typed in a different format | PASS |
@@ -116,23 +128,24 @@ Screenshots of each step: `test-artifacts/*.png` (also delivered with this repor
 | legacy lead import (82 leads) | imports all 82, merges duplicates by phone, keeps incomplete records and preserves originals | PASS |
 | legacy lead import (82 leads) | is safe to run twice (nothing duplicated) | PASS |
 
-## Backup, migration, rollback and restore drill
-
-Simulated production database: the legacy tables (`leads` with 82 rows, plus `payments`, `messages`, `campaigns`, `packages`, `properties`, `settings`, `proposals` — names that also exist in the new CRM).
+## Migration / import / rollback drill (simulated production with Supabase roles)
 
 - PASS 1. Backup taken with pg_dump (20K)
 - PASS 2a. Migration applied; re-running is a no-op
+- PASS 2c. Double-booking extension installed in Supabase's extensions schema
+- PASS 2d. Supabase public role (anon) is refused access to CRM tables
 - PASS 2b. All legacy tables byte-for-byte unchanged after migration (including same-named payments/messages/campaigns/packages/properties)
 - PASS 3a. Import found 82 leads: { found: 82, created: 74, merged: 8, skipped: 0, noPhone: 6 }
 - PASS 3b. Every one of the 82 original lead IDs is linked to a customer
+- PASS 3d. Second import: 82 skipped, customer count unchanged (74) — no duplicates
 - PASS 3c. Legacy leads table untouched by the import
 - PASS 4a. Rollback (DROP SCHEMA crm) removes the new CRM completely
 - PASS 4b. Legacy data identical after rollback
 - PASS 5. Backup restored into a fresh database; data identical to the original
 
-## How to re-run
+## Re-run
 ```
-npm test                       # integration tests (needs TEST_DATABASE_URL or local Postgres on /tmp:5433)
-tests/e2e/run-local.sh         # browser acceptance test
-tests/e2e/backup-rollback.sh   # backup / rollback drill
+npm test
+tests/e2e/run-local.sh
+tests/e2e/backup-rollback.sh
 ```
