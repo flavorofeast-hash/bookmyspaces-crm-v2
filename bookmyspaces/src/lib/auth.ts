@@ -42,7 +42,7 @@ export function readSessionToken(token: string | undefined, now = Date.now()): {
 }
 
 export async function getCurrentUser(): Promise<User | null> {
-  const s = readSessionToken(cookies().get(SESSION_COOKIE)?.value)
+  const s = readSessionToken((await cookies()).get(SESSION_COOKIE)?.value)
   if (!s) return null
   return q1<User>(
     `SELECT id, email, name, role FROM crm.app_users WHERE id = $1 AND active AND session_version = $2`,
@@ -62,8 +62,8 @@ export async function requireOwner(): Promise<User> {
   return u
 }
 
-export function setSessionCookie(userId: string, version: number) {
-  cookies().set(SESSION_COOKIE, makeSessionToken(userId, version), {
+export async function setSessionCookie(userId: string, version: number) {
+  ;(await cookies()).set(SESSION_COOKIE, makeSessionToken(userId, version), {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -72,8 +72,8 @@ export function setSessionCookie(userId: string, version: number) {
   })
 }
 
-export function clearSessionCookie() {
-  cookies().delete(SESSION_COOKIE)
+export async function clearSessionCookie() {
+  ;(await cookies()).delete(SESSION_COOKIE)
 }
 
 /** Returns the user on success, or an error message. Locks an email after 10 failures in 15 minutes. */
@@ -91,6 +91,6 @@ export async function attemptLogin(emailRaw: string, password: string): Promise<
   }
   await q(`UPDATE crm.app_users SET last_login_at = now() WHERE id = $1`, [row.id])
   await q(`DELETE FROM crm.login_failures WHERE email = $1`, [email])
-  setSessionCookie(row.id, row.session_version)
+  await setSessionCookie(row.id, row.session_version)
   return { id: row.id, email: row.email, name: row.name, role: row.role }
 }

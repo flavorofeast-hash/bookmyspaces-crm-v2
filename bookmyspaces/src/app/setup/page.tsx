@@ -32,12 +32,13 @@ async function createOwner(f: FormData) {
   let err = ''
   try {
     const u = await createUser(f, 'owner')
-    setSessionCookie(u.id, u.session_version)
+    await setSessionCookie(u.id, u.session_version)
   } catch (e) { err = (e as Error).message }
   redirect(err ? '/setup?err=' + encodeURIComponent(err) : '/settings?ok=' + encodeURIComponent('Welcome! Start by entering your business details, properties and rooms.'))
 }
 
-export default async function SetupPage({ searchParams }: { searchParams: { err?: string; ok?: string } }) {
+export default async function SetupPage(props: { searchParams: Promise<{ err?: string; ok?: string }> }) {
+  const searchParams = await props.searchParams
   let state: Awaited<ReturnType<typeof setupState>>
   let dbError = ''
   try { state = await setupState() } catch (e) { state = 'missing-config'; dbError = (e as Error).message }

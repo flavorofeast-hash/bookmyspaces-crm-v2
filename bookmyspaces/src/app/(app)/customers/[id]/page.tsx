@@ -9,7 +9,9 @@ import { SubmitButton } from '@/components/client'
 import { formatPhone, waLink } from '@/lib/phone'
 import { inr, fmtDate, fmtDateTime, STATUS_LABEL, BOOKING_TYPE_LABEL, SOURCE_LABEL, PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL, DOC_LABEL, istDate, addDays } from '@/lib/format'
 
-export default async function CustomerPage({ params, searchParams }: { params: { id: string }; searchParams: { ok?: string; err?: string } }) {
+export default async function CustomerPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
+  const params = await props.params
+  const searchParams = await props.searchParams
   const c = await getCustomer(params.id).catch(() => null)
   if (!c) notFound()
   const [campaigns, followUps, bookings, payments, documents, messages, activity] = await Promise.all([

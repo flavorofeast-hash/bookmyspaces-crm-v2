@@ -10,7 +10,9 @@ import { SubmitButton } from '@/components/client'
 import { inr, fmtDate, fmtDateTime, istDate, addDays, STATUS_LABEL, BOOKING_TYPE_LABEL, PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL, DOC_LABEL, EVENT_TYPES } from '@/lib/format'
 import { formatPhone, waLink } from '@/lib/phone'
 
-export default async function BookingPage({ params, searchParams }: { params: { id: string }; searchParams: { ok?: string; err?: string; receipt?: string } }) {
+export default async function BookingPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; err?: string; receipt?: string }> }) {
+  const params = await props.params
+  const searchParams = await props.searchParams
   const user = await requireUser()
   const b = await getBooking(params.id).catch(() => null)
   if (!b) notFound()

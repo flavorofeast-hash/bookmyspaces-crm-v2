@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic'
 
 // Public, customer-facing copy of one document. The token is a random
 // 24-character secret generated per document; nothing else is exposed.
-export default async function PublicDocPage({ params }: { params: { token: string } }) {
+export default async function PublicDocPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params
   if (!/^[A-Za-z0-9_-]{20,40}$/.test(params.token)) notFound()
   const doc = await getDocument({ token: params.token }).catch(() => null)
   if (!doc) notFound()

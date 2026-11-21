@@ -24,13 +24,22 @@ const shot = (n, full = true) => page.screenshot({ path: `${OUT}/${n}.png`, full
 const go = (p) => page.goto(BASE + p, { waitUntil: 'networkidle0' })
 const text = () => page.evaluate(() => document.body.innerText)
 async function submit(selector) {
-  await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }), page.click(selector)])
+  const before = page.url()
+  await Promise.all([page.waitForNavigation({ waitUntil: 'networkidle0' }).catch(() => {}), page.click(selector)])
+  // Server actions finish with a client-side transition: wait until the new page has rendered.
+  await page.waitForNetworkIdle({ idleTime: 400, timeout: 15000 }).catch(() => {})
+  await new Promise((r) => setTimeout(r, 300))
+  return before
 }
 async function fill(name, value, scope = '') {
   const sel = `${scope} [name="${name}"]`.trim()
   await page.$eval(sel, (el, v) => { el.value = v; el.dispatchEvent(new Event('input', { bubbles: true })) }, value)
 }
-const expectText = async (re, label) => { const t = await text(); if (!re.test(t)) throw new Error(`expected ${label ?? re} on ${page.url()}\n---\n${t.slice(0, 600)}`) }
+const expectText = async (re, label) => {
+  let t = ''
+  for (let i = 0; i < 16; i++) { t = await text(); if (re.test(t)) return; await new Promise((r) => setTimeout(r, 500)) }
+  throw new Error(`expected ${label ?? re} on ${page.url()}\n---\n${t.slice(0, 600)}`)
+}
 function sign(raw) { return 'sha256=' + crypto.createHmac('sha256', SECRET).update(raw).digest('hex') }
 async function webhook(payload, sig = true) {
   const raw = JSON.stringify(payload)
@@ -260,6 +269,7 @@ await step('Marketing: create post with image, preview, publish to Facebook & In
   await expectText(/Post saved/); await expectText(/Connected to Page/)
   await submit('button::-p-text(Publish to Facebook now)'); await expectText(/Published on Facebook — confirmed by Meta/); await expectText(/Post ID: PAGE1_/)
   await submit('button::-p-text(Publish to Instagram now)'); await expectText(/Published on Instagram/); await expectText(/IGMEDIA/)
+  await expectText(/Already published — publish again/) // no accidental double posting
   await shot('16-post-published')
 })
 

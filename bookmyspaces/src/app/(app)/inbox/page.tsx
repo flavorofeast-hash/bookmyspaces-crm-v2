@@ -5,7 +5,8 @@ import { PageHeader, Card, Flash, Empty } from '@/components/ui'
 import { fmtDateTime } from '@/lib/format'
 import { formatPhone } from '@/lib/phone'
 
-export default async function InboxPage({ searchParams }: { searchParams: { ok?: string; err?: string } }) {
+export default async function InboxPage(props: { searchParams: Promise<{ ok?: string; err?: string }> }) {
+  const searchParams = await props.searchParams
   const rows = await conversations()
   return (
     <>

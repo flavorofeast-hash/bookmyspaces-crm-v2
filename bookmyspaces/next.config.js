@@ -1,12 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ['pg'],
+  outputFileTracingIncludes: { '/setup': ['./db/migrations/**/*'] },
   experimental: {
     serverActions: {
       allowedOrigins: ['bookmyspaces.in', 'www.bookmyspaces.in', '*.vercel.app', 'localhost:3000'],
       bodySizeLimit: '6mb',
     },
-    serverComponentsExternalPackages: ['pg'],
-    outputFileTracingIncludes: { '/setup': ['./db/migrations/**/*'] },
   },
   async headers() {
     return [

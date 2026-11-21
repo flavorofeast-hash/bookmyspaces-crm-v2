@@ -7,7 +7,8 @@ import { PrintButton, CopyButton } from '@/components/client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function DocPage({ params }: { params: { id: string } }) {
+export default async function DocPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params
   await requireUser()
   const doc = await getDocument({ id: params.id }).catch(() => null)
   if (!doc) notFound()

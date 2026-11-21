@@ -3,7 +3,16 @@
 -- are never touched, renamed or dropped by this migration. Rolling back is
 -- simply: DROP SCHEMA crm CASCADE;  (legacy data stays exactly as it was).
 
-CREATE EXTENSION IF NOT EXISTS btree_gist;
+-- btree_gist powers the double-booking guard. On Supabase extensions live in
+-- the "extensions" schema; elsewhere the default schema is used.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'extensions') THEN
+    CREATE EXTENSION IF NOT EXISTS btree_gist WITH SCHEMA extensions;
+  ELSE
+    CREATE EXTENSION IF NOT EXISTS btree_gist;
+  END IF;
+END $$;
 CREATE SCHEMA IF NOT EXISTS crm;
 SET search_path TO crm, public, extensions;
 

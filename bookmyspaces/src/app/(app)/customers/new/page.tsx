@@ -4,7 +4,8 @@ import { CustomerFields } from '@/components/customer-form'
 import { PageHeader, Card, Flash, Field } from '@/components/ui'
 import { SubmitButton } from '@/components/client'
 
-export default async function NewCustomerPage({ searchParams }: { searchParams: { ok?: string; err?: string } }) {
+export default async function NewCustomerPage(props: { searchParams: Promise<{ ok?: string; err?: string }> }) {
+  const searchParams = await props.searchParams
   const campaigns = await q<any>(`SELECT id, name, code FROM crm.campaigns ORDER BY created_at DESC`)
   return (
     <>

@@ -13,7 +13,8 @@ async function login(f: FormData) {
   redirect('/today')
 }
 
-export default async function LoginPage({ searchParams }: { searchParams: { err?: string; ok?: string } }) {
+export default async function LoginPage(props: { searchParams: Promise<{ err?: string; ok?: string }> }) {
+  const searchParams = await props.searchParams
   const state = await setupState().catch(() => 'missing-config' as const)
   if (state !== 'ready') redirect('/setup')
   if (await getCurrentUser()) redirect('/today')

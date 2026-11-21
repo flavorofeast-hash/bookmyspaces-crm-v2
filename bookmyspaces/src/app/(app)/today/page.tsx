@@ -6,7 +6,8 @@ import { SubmitButton } from '@/components/client'
 import { inr, fmtDate, fmtTime, fmtDay, fmtDateTime, SOURCE_LABEL, STATUS_LABEL } from '@/lib/format'
 import { formatPhone } from '@/lib/phone'
 
-export default async function TodayPage({ searchParams }: { searchParams: { ok?: string; err?: string } }) {
+export default async function TodayPage(props: { searchParams: Promise<{ ok?: string; err?: string }> }) {
+  const searchParams = await props.searchParams
   const d = await todayData()
   const free = d.spaces.filter((s) => !s.busy)
   const attention = d.followUps.length + d.newEnquiries.length + d.unread.length + d.dueSoon.length

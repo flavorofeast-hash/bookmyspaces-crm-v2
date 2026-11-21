@@ -5,7 +5,8 @@ import { inr, fmtDate, fmtDateTime, DOC_LABEL, PAYMENT_KIND_LABEL, PAYMENT_METHO
 
 type SP = { tab?: string; type?: string; ok?: string; err?: string }
 
-export default async function BillingPage({ searchParams: sp }: { searchParams: SP }) {
+export default async function BillingPage(props: { searchParams: Promise<SP> }) {
+  const sp = await props.searchParams
   const tab = ['documents', 'transactions'].includes(sp.tab ?? '') ? sp.tab! : 'outstanding'
   const totals = await q1<any>(`SELECT
       (SELECT COALESCE(sum(bb.balance),0) FROM crm.booking_balances bb JOIN crm.bookings b ON b.id = bb.booking_id WHERE b.status IN ('confirmed','completed') AND bb.balance > 0) AS outstanding,

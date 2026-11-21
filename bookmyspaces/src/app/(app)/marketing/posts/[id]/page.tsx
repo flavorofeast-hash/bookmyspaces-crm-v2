@@ -3,13 +3,15 @@ import { notFound } from 'next/navigation'
 import { q, q1 } from '@/lib/db'
 import { getPost, facebookConnection, instagramConnection, trackingLink } from '@/lib/marketing'
 import { savePostAction, publishAction, markManualAction } from '../../actions'
-import { PageHeader, Card, Flash, Field, Hidden, Badge, Empty } from '@/components/ui'
+import { PageHeader, Card, Flash, Field, Hidden, Badge, Empty, Reveal } from '@/components/ui'
 import { SubmitButton, CopyButton, CharCount } from '@/components/client'
 import { fmtDateTime } from '@/lib/format'
 
 const PL: Record<string, string> = { facebook: 'Facebook', instagram: 'Instagram', google: 'Google Business' }
 
-export default async function PostPage({ params, searchParams }: { params: { id: string }; searchParams: { ok?: string; err?: string } }) {
+export default async function PostPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
+  const params = await props.params
+  const searchParams = await props.searchParams
   const isNew = params.id === 'new'
   const post = isNew ? null : await getPost(params.id).catch(() => null)
   if (!isNew && !post) notFound()
@@ -66,7 +68,9 @@ export default async function PostPage({ params, searchParams }: { params: { id:
                     <div className="font-medium flex items-center gap-2">Facebook {latest('facebook') && <Badge value={latest('facebook').status} />}</div>
                     <p className={`text-xs ${fb.ok ? 'text-emerald-700' : 'text-amber-700'}`}>{fb.detail}</p>
                     {fb.ok ? (
-                      <form action={publishAction} className="mt-2"><Hidden name="id" value={post.id} /><Hidden name="platform" value="facebook" /><SubmitButton className="btn-primary btn-sm" pendingText="Publishing…">Publish to Facebook now</SubmitButton></form>
+                      (latest('facebook')?.status === 'published'
+                      ? <div className="mt-2"><Reveal label="Already published — publish again?"><form action={publishAction}><Hidden name="id" value={post.id} /><Hidden name="platform" value="facebook" /><SubmitButton className="btn-secondary btn-sm" pendingText="Publishing…">Yes, publish to Facebook again</SubmitButton></form></Reveal></div>
+                      : <form action={publishAction} className="mt-2"><Hidden name="id" value={post.id} /><Hidden name="platform" value="facebook" /><SubmitButton className="btn-primary btn-sm" pendingText="Publishing…">Publish to Facebook now</SubmitButton></form>)
                     ) : <p className="text-xs muted mt-1">Automatic publishing is unavailable until the connection works. You can post manually and mark it below.</p>}
                   </div>
                 )}
@@ -75,7 +79,9 @@ export default async function PostPage({ params, searchParams }: { params: { id:
                     <div className="font-medium flex items-center gap-2">Instagram {latest('instagram') && <Badge value={latest('instagram').status} />}</div>
                     <p className={`text-xs ${ig.ok ? 'text-emerald-700' : 'text-amber-700'}`}>{ig.detail}</p>
                     {ig.ok && post.media_token ? (
-                      <form action={publishAction} className="mt-2"><Hidden name="id" value={post.id} /><Hidden name="platform" value="instagram" /><SubmitButton className="btn-primary btn-sm" pendingText="Publishing…">Publish to Instagram now</SubmitButton></form>
+                      (latest('instagram')?.status === 'published'
+                      ? <div className="mt-2"><Reveal label="Already published — publish again?"><form action={publishAction}><Hidden name="id" value={post.id} /><Hidden name="platform" value="instagram" /><SubmitButton className="btn-secondary btn-sm" pendingText="Publishing…">Yes, publish to Instagram again</SubmitButton></form></Reveal></div>
+                      : <form action={publishAction} className="mt-2"><Hidden name="id" value={post.id} /><Hidden name="platform" value="instagram" /><SubmitButton className="btn-primary btn-sm" pendingText="Publishing…">Publish to Instagram now</SubmitButton></form>)
                     ) : ig.ok ? <p className="text-xs text-amber-700">Add an image to publish on Instagram.</p> : <p className="text-xs muted mt-1">Automatic publishing is unavailable until the connection works. You can post manually and mark it below.</p>}
                   </div>
                 )}

@@ -4,7 +4,8 @@ import { PageHeader, Card, Flash, Empty, Badge } from '@/components/ui'
 import { formatPhone } from '@/lib/phone'
 import { inr, fmtDate, SOURCE_LABEL } from '@/lib/format'
 
-export default async function CustomersPage({ searchParams }: { searchParams: { q?: string; ok?: string; err?: string } }) {
+export default async function CustomersPage(props: { searchParams: Promise<{ q?: string; ok?: string; err?: string }> }) {
+  const searchParams = await props.searchParams
   const term = searchParams.q ?? ''
   const rows = await searchCustomers(term, 100)
   return (

@@ -35,7 +35,8 @@ function SpaceList({ spaces, name, unit }: { spaces: AvailabilitySpace[]; name: 
   )
 }
 
-export default async function NewBookingPage({ searchParams: sp }: { searchParams: SP }) {
+export default async function NewBookingPage(props: { searchParams: Promise<SP> }) {
+  const sp = await props.searchParams
   const type = (['room_stay', 'event', 'event_with_stay'].includes(sp.type ?? '') ? sp.type : 'event') as string
   const [customer, slots, packages, recent, settings] = await Promise.all([
     sp.customer ? q1<any>(`SELECT id, name, phone FROM crm.customers WHERE id = $1`, [sp.customer]).catch(() => null) : null,

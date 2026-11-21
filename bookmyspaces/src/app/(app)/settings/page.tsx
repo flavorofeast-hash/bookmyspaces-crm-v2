@@ -23,7 +23,8 @@ function SpaceFields({ s }: { s?: any }) {
   )
 }
 
-export default async function SettingsPage({ searchParams }: { searchParams: { ok?: string; err?: string; import?: string; added?: string } }) {
+export default async function SettingsPage(props: { searchParams: Promise<{ ok?: string; err?: string; import?: string; added?: string }> }) {
+  const searchParams = await props.searchParams
   await requireOwner()
   const [s, properties, spaces, slots, packages, users, replies, templates, legacy] = await Promise.all([
     getSettings(),

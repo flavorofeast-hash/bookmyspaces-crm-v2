@@ -11,7 +11,9 @@ import { formatPhone, waLink } from '@/lib/phone'
 
 const TYPE_LABEL: Record<string, string> = { image: '📷 Photo', audio: '🎤 Voice note', video: '🎬 Video', document: '📄 Document', location: '📍 Location', sticker: 'Sticker', contacts: '👤 Contact' }
 
-export default async function ThreadPage({ params, searchParams }: { params: { customerId: string }; searchParams: { ok?: string; err?: string } }) {
+export default async function ThreadPage(props: { params: Promise<{ customerId: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
+  const params = await props.params
+  const searchParams = await props.searchParams
   const c = await q1<any>(`SELECT id, name, phone, whatsapp FROM crm.customers WHERE id = $1`, [params.customerId]).catch(() => null)
   if (!c) notFound()
   const [msgs, replies, templates, win, booking] = await Promise.all([
