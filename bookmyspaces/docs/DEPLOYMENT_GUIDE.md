@@ -4,7 +4,9 @@ Prepared 22 Nov 2026. Live V3 is untouched. Nothing below changes production unt
 
 ## Facts this guide relies on (checked 22 Nov 2026)
 - GitHub `main` = `fc46825` (live V3). Branch `simplify` (v2, tip commit "Deployment guide v1 (final prep commit)"), built on `main`, changes only `bookmyspaces/` and `archive/`.
-- Vercel deploys this repo automatically through its GitHub app (`vercel[bot]` created every past deployment). Only `main` goes to **Production**; any other branch pushed becomes a **Preview** deployment.
+- Vercel deploys this repo through its GitHub app (`vercel[bot]`). Only `main` goes to **Production**.
+- **Automatic Preview builds have been off since mid-2026.** The last Preview was 28 May 2026; the branch pushed on 15 Jul 2026 and `simplify` (pushed 22 Nov 2026) got none. A Preview must be created from the Vercel dashboard (Part C).
+- `simplify` was pushed to GitHub on 22 Nov 2026 (tip `6843a9a`); `main` stayed `fc46825`.
 - Vercel team: `raju1605jobs-hashs-projects`, project `bookmyspaces-crm-v2`, region `bom1`. The app lives in the `bookmyspaces/` folder (same as V3, so the Root Directory setting needs no change).
 - A clean install (`npm ci`) and production build of `simplify` succeed with no environment variables. Without `CRM_DATABASE_URL` the site only shows setup instructions and refuses webhooks (HTTP 503).
 
@@ -49,8 +51,11 @@ Important for Preview: if the existing `WHATSAPP_*` values are set for **All Env
 Variables the V3 site uses that v2 ignores (leave them until V3 is retired): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_*`, `WATI_*`, `CRON_SECRET`, `DATABASE_URL`.
 
 ## Part C — Preview deployment and testing
-1. After Part A, Vercel builds the preview automatically (Deployments tab → branch `simplify`). Preview address pattern: `bookmyspaces-crm-v2-git-simplify-raju1605jobs-hashs-projects.vercel.app`.
-2. Create a **free** Supabase project `bookmyspaces-test`; put its connection string in `CRM_DATABASE_URL` (Preview only), plus `SESSION_SECRET`, `CRM_SETUP_CODE`, `APP_PUBLIC_URL` (Preview). Redeploy the preview.
+1. **Test database:** create a **free** Supabase project `bookmyspaces-test` (separate from production). In its SQL Editor run `db/test-data/legacy_leads_82_TEST.sql` (82 synthetic leads; it refuses to run on a database that has legacy tables).
+2. **Remove production secrets from Preview:** Vercel → Settings → Environment Variables. For each existing variable that is ticked for *Preview* (especially `WHATSAPP_*`, `DATABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_*`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_*`): **Edit → untick Preview** (keep Production ticked). This only removes them from Preview; the Production values are not changed.
+3. **Add Preview-only variables:** `CRM_DATABASE_URL` (test project's Session pooler string), `SESSION_SECRET`, `CRM_SETUP_CODE`, `APP_PUBLIC_URL` (fill in after step 4, then redeploy). Tick **Preview only**.
+4. **Create the Preview:** Vercel → Deployments → **Create Deployment** (or ⋯ menu) → Git reference **`simplify`** → Deploy. (Or Settings → Git → check "Ignored Build Step" is *Automatic*, then any push to `simplify` builds a Preview.) The address will look like `bookmyspaces-crm-v2-git-simplify-raju1605jobs-hashs-projects.vercel.app`.
+5. **Protection:** previews are normally behind "Vercel Authentication". For automated testing, create a **Protection Bypass for Automation** (Settings → Deployment Protection) and give it to Claude through a secure channel, or temporarily turn protection off for Preview.
 3. Open `<preview>/setup` → setup code → **Create database tables** → create the owner account.
 4. Try the workflow: Settings (properties, rooms) → + New enquiry → New booking → Confirm → Record payment → receipt → balance.
 5. WhatsApp test (optional): Meta test app webhook → `<preview>/api/whatsapp/webhook`. Vercel preview protection blocks Meta; either disable "Vercel Authentication" for previews temporarily or add a Protection Bypass.
@@ -66,6 +71,9 @@ Variables the V3 site uses that v2 ignores (leave them until V3 is retired): `NE
 8. The live Meta webhook URL (`/api/whatsapp/webhook`) stays the same — **no Meta dashboard change**.
 
 ## Rollback (any time)
+
+Full details, with application and database rollback documented separately: `docs/ROLLBACK.md`.
+
 - **Code**: Vercel → Deployments → previous production deployment → ⋯ → **Promote to Production** (about a minute). V3 is back exactly as before because its tables were never changed.
 - **Database (optional)**: the v2 data lives only in schema `crm`. To remove it: `DROP SCHEMA crm CASCADE;` (legacy `public` tables are unaffected). Only do this after exporting anything you want to keep.
 - **Git**: `main` can be reset to `fc46825` by reverting the merge commit; the backup bundles in `_backups/2026-11-21/` hold the full original history.
