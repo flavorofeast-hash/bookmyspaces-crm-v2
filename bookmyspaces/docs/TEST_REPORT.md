@@ -1,3 +1,35 @@
+# Hosted Preview acceptance — 22 Nov 2026 (real Vercel Preview, real Supabase test DB)
+
+- URL: https://bookmyspaces-crm-next-git-simplify-raju1605jobs-hashs-projects.vercel.app (Vercel project `bookmyspaces-crm-next`, fork `flavorofeast-hash/bookmyspaces-crm-v2`, branch `simplify`, commit 000ea2d)
+- DB: separate Supabase test project via Vercel integration, Preview-only `CRMTEST_*` variables. Live V3 project/alias untouched.
+- Driven in a real browser against the deployed site. WhatsApp/Facebook/Instagram NOT live-tested (no test credentials; correctly shown as not connected).
+
+| # | Test | Result |
+|---|---|---|
+| 1 | Health endpoint; DB reachable; WhatsApp/Meta off in Preview | PASS |
+| 2 | One-click test setup → crm tables + shared login admin/admin; default-password banner | PASS |
+| 3 | Settings: business, 2 properties, 4 rooms (bulk) + 2 family rooms, hall, rooftop, package | PASS |
+| 4 | Import 82 legacy leads: 74 new, 8 merged, 6 without mobile; re-run 0 new / 82 already imported | PASS |
+| 5 | Add customer; duplicate mobile in different format redirects to existing record | PASS |
+| 6 | Hall enquiry; second enquiry same hall/time allowed as tentative ("Enquiry pending") | PASS |
+| 7 | Two tabs, same admin login, both "Confirm booking" fired at the same instant → one confirmed, other "Double booking prevented" | PASS |
+| 8 | Food line + quotation QT-; total ₹60,000 | PASS |
+| 9 | Advance ₹20,000 UPI → RCP-2026-0001, printable receipt, balance ₹40,000; Billing + Today show outstanding | PASS |
+| 10 | Final bill BILL-2026-0001; balance ₹40,000 cash → RCP-2026-0002; balance ₹0 | PASS |
+| 11 | Cancel booking (reason required) → hall freed; refund ₹15,000 (reason required, max = paid) → RFN-2026-0001 | PASS |
+| 12 | Freed hall: other customer's enquiry now confirms | PASS |
+| 13 | Event + stay: rooftop + 2 rooms confirmed (₹20,600); booked hall/rooms shown disabled for overlapping dates | PASS |
+| 14 | Search by mobile → full history (quotation, bill, receipts, refund note) | PASS |
+| 15 | Today, Bookings calendar, Billing, Inbox, Marketing pages load (200) | PASS |
+| 16 | Marketing: campaign + WhatsApp link; draft post saved; publishing disabled (Meta not connected) | PASS |
+| 17 | Sign out → protected pages redirect to /login; wrong password refused; admin/admin signs in | PASS |
+| 18 | Webhook rejects unverified calls (403); pages refuse framing | PASS |
+| 19 | Mobile 375px: no horizontal overflow on Today, Bookings, Settings, booking detail | PASS |
+
+19/19 passed; no fixes needed.
+
+---
+
 # BookMySpaces CRM v2 — Test Report
 
 **Update 22 Nov 2026 (shared login):** re-run after adding the shared `admin` login, one-click Preview setup and DB-stored session key. Results on the new commit:
