@@ -1,4 +1,4 @@
-// Usage: CRM_DATABASE_URL=... npm run db:create-owner -- "Name" email@example.com 'password'
+// Usage: CRM_DATABASE_URL=... npm run db:create-owner -- "Team" admin 'strong password'   (second value = username)
 import { pool } from '../src/lib/db'
 import { createUser } from '../src/lib/setup'
 

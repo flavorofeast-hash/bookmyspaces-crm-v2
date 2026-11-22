@@ -25,7 +25,7 @@ export default async function LoginPage(props: { searchParams: Promise<{ err?: s
         <p className="text-sm muted mb-5">Sign in to continue</p>
         <Flash err={searchParams.err} ok={searchParams.ok} />
         <form action={login} className="space-y-3">
-          <label className="block"><span className="label">Email</span><input name="email" type="email" autoComplete="username" required className="input" /></label>
+          <label className="block"><span className="label">Username</span><input name="email" autoComplete="username" autoCapitalize="none" required className="input" /></label>
           <label className="block"><span className="label">Password</span><input name="password" type="password" autoComplete="current-password" required className="input" /></label>
           <SubmitButton className="btn-primary w-full" pendingText="Signing in…">Sign in</SubmitButton>
         </form>

@@ -1,7 +1,8 @@
 'use server'
 
-import { requireOwner } from '@/lib/auth'
-import { saveSettings, saveProperty, addSpaces, updateSpace, savePackage, saveSlot, createUser, setUserPassword, setUserActive } from '@/lib/setup'
+import { requireOwner, setSessionCookie } from '@/lib/auth'
+import { saveSettings, saveProperty, addSpaces, updateSpace, savePackage, saveSlot, createUser, setUserPassword, setUserActive, setUsername, signOutEverywhere } from '@/lib/setup'
+import { q1 } from '@/lib/db'
 import { importLegacyLeads } from '@/lib/customers'
 import { run, str } from '@/lib/action'
 import { q } from '@/lib/db'
@@ -18,7 +19,15 @@ export async function updateSpaceAction(f: FormData) { await requireOwner(); awa
 export async function savePackageAction(f: FormData) { await requireOwner(); await run(B + '#packages', 'Package saved.', async () => { await savePackage(f) }) }
 export async function saveSlotAction(f: FormData) { await requireOwner(); await run(B + '#slots', 'Time slot saved.', async () => { await saveSlot(f) }) }
 export async function createUserAction(f: FormData) { await requireOwner(); await run(B + '#users', 'User added. Give them their email and password.', async () => { await createUser(f) }) }
-export async function resetPasswordAction(f: FormData) { await requireOwner(); await run(B + '#users', 'Password changed. They must sign in again.', async () => { await setUserPassword(str(f, 'user_id'), String(f.get('password') ?? '')) }) }
+/** Keeps the current device signed in after a password change / sign-out-everywhere; all other devices are signed out. */
+async function stayIn(userId: string, me: string) {
+  if (userId !== me) return
+  const r = await q1<{ session_version: number }>(`SELECT session_version FROM crm.app_users WHERE id = $1`, [userId])
+  if (r) await setSessionCookie(userId, r.session_version)
+}
+export async function resetPasswordAction(f: FormData) { const u = await requireOwner(); await run(B + '#users', 'Password changed. Every other device has been signed out.', async () => { await setUserPassword(str(f, 'user_id'), String(f.get('password') ?? '')); await stayIn(str(f, 'user_id'), u.id) }) }
+export async function changeUsernameAction(f: FormData) { await requireOwner(); await run(B + '#users', 'Username changed. Use it next time you sign in.', async () => { await setUsername(str(f, 'user_id'), str(f, 'username')) }) }
+export async function signOutAllAction(f: FormData) { const u = await requireOwner(); await run(B + '#users', 'All other devices have been signed out.', async () => { await signOutEverywhere(str(f, 'user_id')); await stayIn(str(f, 'user_id'), u.id) }) }
 export async function toggleUserAction(f: FormData) { const u = await requireOwner(); await run(B + '#users', 'User updated.', async () => { await setUserActive(str(f, 'user_id'), f.get('active') === 'true', u.id) }) }
 export async function saveQuickReplyAction(f: FormData) {
   await requireOwner()

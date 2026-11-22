@@ -1,7 +1,7 @@
 // Acceptance test for a DEPLOYED preview that starts with an EMPTY test database.
 // It builds everything through the screens (setup → owner → settings → workflow).
 // Usage:
-//   BASE=https://<preview-url> SETUP_CODE=<code> OWNER_EMAIL=<email> OWNER_PASSWORD=<pw> node tests/e2e/preview-acceptance.mjs
+//   BASE=https://<preview-url> node tests/e2e/preview-acceptance.mjs      (uses the shared test login admin/admin)
 // Optional: VERCEL_BYPASS=<protection-bypass-token> if the preview is protected.
 // Secrets are read from the environment and never printed.
 import puppeteer from 'puppeteer-core'
@@ -9,11 +9,11 @@ import fs from 'node:fs'
 
 const BASE = (process.env.BASE ?? '').replace(/\/$/, '')
 const SETUP_CODE = process.env.SETUP_CODE ?? ''
-const EMAIL = process.env.OWNER_EMAIL ?? 'owner@preview.test'
-const PASSWORD = process.env.OWNER_PASSWORD ?? ''
+const EMAIL = process.env.OWNER_EMAIL ?? 'admin'
+const PASSWORD = process.env.OWNER_PASSWORD ?? 'admin'
 const BYPASS = process.env.VERCEL_BYPASS ?? ''
 const OUT = process.env.OUT ?? 'test-artifacts/preview'
-if (!BASE || !PASSWORD) { console.error('Set BASE and OWNER_PASSWORD (and SETUP_CODE for a fresh database).'); process.exit(2) }
+if (!BASE) { console.error('Set BASE.'); process.exit(2) }
 fs.mkdirSync(OUT, { recursive: true })
 const results = []
 const ist = (days) => new Date(Date.now() + 5.5 * 3600e3 + days * 864e5).toISOString().slice(0, 10)
@@ -73,11 +73,15 @@ await step('Logged-out visitor is redirected to login/setup', async () => {
 await step('First-time setup: create tables and owner (skipped if already done)', async () => {
   await go('/setup')
   if (page.url().includes('/login')) return 'already set up'
+  if ((await text()).includes('Set up test copy')) {
+    await submit('button[type=submit]'); await expectText(/Test copy ready|Business details/)
+    return 'one-click test setup: tables + admin/admin'
+  }
   if ((await text()).includes('Create database tables')) {
     await fill('code', SETUP_CODE); await submit('button[type=submit]'); await expectText(/Database tables created|Step 2 of 2/)
   }
-  if ((await text()).includes('Create owner account')) {
-    await fill('name', 'Preview Owner'); await fill('email', EMAIL); await fill('password', PASSWORD); await fill('code', SETUP_CODE)
+  if ((await text()).includes('Create login')) {
+    await fill('username', EMAIL); await fill('password', PASSWORD); await fill('code', SETUP_CODE)
     await submit('button[type=submit]'); await expectText(/Welcome|Business details/)
     return 'tables + owner created'
   }
@@ -224,6 +228,37 @@ await step('WhatsApp webhook security on the deployed site', async () => {
   const b = await fetch(BASE + '/api/whatsapp/webhook', { method: 'POST', headers: { 'content-type': 'application/json', 'x-hub-signature-256': 'sha256=' + '0'.repeat(64), ...h }, body }).then((r) => r.status)
   if (![401, 503].includes(a) || ![401, 503].includes(b)) throw new Error(`unsigned ${a}, forged ${b}`)
   return `unsigned → ${a}, forged → ${b} (${a === 503 ? 'no WhatsApp secret set for Preview: all webhook calls refused' : 'signature required'})`
+})
+
+await step('Shared login: two team members signed in as admin at once; same hall confirmed simultaneously → exactly one wins', async () => {
+  const D = ist(250 + (parseInt(RUN, 36) % 100))
+  const open = async () => {
+    const ctx = await browser.createBrowserContext(); const p = await ctx.newPage(); p.setDefaultTimeout(30000)
+    if (BYPASS) await p.setExtraHTTPHeaders({ 'x-vercel-protection-bypass': BYPASS })
+    await p.goto(BASE + '/login', { waitUntil: 'networkidle0' }); await p.type('[name=email]', EMAIL); await p.type('[name=password]', PASSWORD)
+    await Promise.all([p.waitForNavigation({ waitUntil: 'networkidle0' }), p.click('button[type=submit]')])
+    if (!p.url().includes('/today')) throw new Error('shared login failed: ' + p.url().split('?')[0])
+    return { ctx, p }
+  }
+  const [m1, m2] = await Promise.all([open(), open()])
+  const enquire = async ({ p }, name, phone) => {
+    await p.goto(`${BASE}/bookings/new?type=event&event_date=${D}&start_time=10:00&end_time=14:00`, { waitUntil: 'networkidle0' })
+    for (const b of await p.$$('input[name=event_ids]')) { if ((await b.evaluate((el) => el.closest('label').innerText)).includes('Celebration Hall')) { await b.click(); break } }
+    await p.$eval('[name=new_name]', (el, v) => { el.value = v }, name); await p.$eval('[name=new_phone]', (el, v) => { el.value = v }, phone)
+    await Promise.all([p.waitForNavigation({ waitUntil: 'networkidle0' }).catch(() => {}), p.click('button[name=intent][value=enquiry]')])
+    for (let i = 0; i < 30; i++) { if (/Booking saved/.test(await p.evaluate(() => document.body.innerText))) return; await new Promise((r) => setTimeout(r, 500)) }
+    throw new Error('enquiry not saved for ' + name)
+  }
+  await Promise.all([enquire(m1, 'Concurrent One ' + RUN, '96' + String(Date.now()).slice(-8)), enquire(m2, 'Concurrent Two ' + RUN, '95' + String(Date.now() + 3).slice(-8))])
+  const confirm = async ({ p }) => {
+    await Promise.all([p.waitForNavigation({ waitUntil: 'networkidle0' }).catch(() => {}), p.click('form button.btn-green')])
+    for (let i = 0; i < 30; i++) { const t = await p.evaluate(() => document.body.innerText); if (/Booking confirmed|Double booking prevented/.test(t)) return /Booking confirmed/.test(t) ? 'won' : 'refused'; await new Promise((r) => setTimeout(r, 500)) }
+    return 'no result'
+  }
+  const outcome = await Promise.all([confirm(m1), confirm(m2)])
+  await m1.ctx.close(); await m2.ctx.close()
+  if (outcome.filter((o) => o === 'won').length !== 1 || outcome.filter((o) => o === 'refused').length !== 1) throw new Error('outcome: ' + outcome)
+  return outcome.join(' / ')
 })
 
 await step('Mobile layout on the deployed site', async () => {

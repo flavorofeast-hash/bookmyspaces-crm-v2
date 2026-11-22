@@ -119,13 +119,13 @@ describe('login security', () => {
     expect(await verifyPassword('correct horse battery', h)).toBe(true)
     expect(await verifyPassword('wrong', h)).toBe(false)
   })
-  it('session tokens: valid, tampered, expired', () => {
-    const t = makeSessionToken('user-1', 3)
-    expect(readSessionToken(t)).toEqual({ u: 'user-1', v: 3 })
+  it('session tokens: valid, tampered, expired', async () => {
+    const t = await makeSessionToken('user-1', 3)
+    expect(await readSessionToken(t)).toEqual({ u: 'user-1', v: 3 })
     const [body, sig] = t.split('.')
     const forged = Buffer.from(JSON.stringify({ u: 'owner-2', v: 3, e: Date.now() + 1e9 })).toString('base64url') + '.' + sig
-    expect(readSessionToken(forged)).toBeNull()
-    expect(readSessionToken(body + '.x' + sig.slice(2))).toBeNull()
-    expect(readSessionToken(makeSessionToken('u', 1, Date.now() - 31 * 864e5))).toBeNull()
+    expect(await readSessionToken(forged)).toBeNull()
+    expect(await readSessionToken(body + '.x' + sig.slice(2))).toBeNull()
+    expect(await readSessionToken(await makeSessionToken('u', 1, Date.now() - 31 * 864e5))).toBeNull()
   })
 })

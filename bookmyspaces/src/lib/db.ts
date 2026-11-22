@@ -62,7 +62,8 @@ export async function tx<T>(fn: (db: PoolClient) => Promise<T>): Promise<T> {
 /** 'missing-config' | 'missing-schema' | 'no-users' | 'ready' */
 export async function setupState(): Promise<'missing-config' | 'missing-schema' | 'no-users' | 'ready'> {
   if (!isDbConfigured()) return 'missing-config'
-  const s = await q1<{ ok: boolean }>(`SELECT to_regclass('crm.app_users') IS NOT NULL AS ok`)
+  // crm.app_secrets comes from the newest migration (003); if it is missing the tables need creating/updating.
+  const s = await q1<{ ok: boolean }>(`SELECT to_regclass('crm.app_users') IS NOT NULL AND to_regclass('crm.app_secrets') IS NOT NULL AS ok`)
   if (!s?.ok) return 'missing-schema'
   const u = await q1<{ n: number }>(`SELECT count(*)::int AS n FROM crm.app_users`)
   return u && u.n > 0 ? 'ready' : 'no-users'

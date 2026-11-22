@@ -3,6 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 source /tmp/e2e.env
+export CRM_ENV=preview   # local run behaves as the test copy (admin/admin allowed); Vercel sets VERCEL_ENV itself
 pkill -f "next-server|next start" 2>/dev/null || true; pkill -f mock-graph.mjs 2>/dev/null || true; sleep 1
 psql -h /tmp -p 5433 -U postgres -q -c "DROP DATABASE IF EXISTS crm_demo" -c "CREATE DATABASE crm_demo"
 ALLOW_SAMPLE_SEED=yes npm run -s db:seed-sample 2>&1 | grep -v Deprecation | tail -1

@@ -1,3 +1,4 @@
+import { allowsDefaultAdmin, isProduction, passwordProblem } from './env'
 import { q, q1, isPgError } from './db'
 import { hashPassword } from './password'
 
@@ -92,25 +93,60 @@ export async function saveSlot(f: FormData) {
   else await q(`INSERT INTO crm.event_slots (name, start_time, end_time, sort_order) VALUES ($1,$2,$3,(SELECT COALESCE(max(sort_order),0)+1 FROM crm.event_slots))`, [name, st, en])
 }
 
+export const DEFAULT_USERNAME = 'admin'
+export const DEFAULT_PASSWORD = 'admin'
+
+/** Username: letters, numbers, dot, dash, underscore or @ (an email also works). */
+function cleanUsername(raw: unknown): string {
+  const u = s(raw as FormDataEntryValue | null)?.toLowerCase() ?? ''
+  if (!/^[a-z0-9._@-]{3,64}$/.test(u)) throw new Error('Username: 3–64 letters, numbers, dots, dashes or underscores.')
+  return u
+}
+
+/** Production needs a strong password; the test copy also accepts the default admin/admin. */
+function checkPassword(pw: string, username: string) {
+  if (isProduction()) { const p = passwordProblem(pw, username); if (p) throw new Error(p); return }
+  if (pw !== DEFAULT_PASSWORD && pw.length < 8) throw new Error('Password must be at least 8 characters.')
+}
+
 export async function createUser(f: FormData, roleOverride?: 'owner') {
-  const email = s(f.get('email'))?.toLowerCase(), name = s(f.get('name')), pw = String(f.get('password') ?? '')
-  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('Enter a valid email address.')
-  if (!name) throw new Error('Enter the person’s name.')
-  if (pw.length < 8) throw new Error('Password must be at least 8 characters.')
+  const username = cleanUsername(f.get('username') ?? f.get('email')), name = s(f.get('name')) ?? 'Team', pw = String(f.get('password') ?? '')
+  checkPassword(pw, username)
   const role = roleOverride ?? (f.get('role') === 'owner' ? 'owner' : 'staff')
   try {
     return (await q1<{ id: string; session_version: number }>(
-      `INSERT INTO crm.app_users (email, name, role, password_hash) VALUES ($1,$2,$3,$4) RETURNING id, session_version`,
-      [email, name, role, await hashPassword(pw)]))!
+      `INSERT INTO crm.app_users (email, name, role, password_hash, uses_default_password) VALUES ($1,$2,$3,$4,$5) RETURNING id, session_version`,
+      [username, name, role, await hashPassword(pw), pw === DEFAULT_PASSWORD]))!
   } catch (e) {
-    if (isPgError(e, '23505')) throw new Error('A user with that email already exists.')
+    if (isPgError(e, '23505')) throw new Error('That username is already taken.')
     throw e
   }
 }
 
+/** Test copy only: creates the shared admin/admin login. */
+export async function createDefaultAdmin() {
+  if (!allowsDefaultAdmin()) throw new Error('The default admin/admin login is only allowed on the test copy.')
+  const f = new FormData(); f.set('username', DEFAULT_USERNAME); f.set('password', DEFAULT_PASSWORD); f.set('name', 'Team')
+  return createUser(f, 'owner')
+}
+
+/** Changing the password signs out every device (session_version bump). */
 export async function setUserPassword(userId: string, pw: string) {
-  if (pw.length < 8) throw new Error('Password must be at least 8 characters.')
-  await q(`UPDATE crm.app_users SET password_hash = $2, session_version = session_version + 1 WHERE id = $1`, [userId, await hashPassword(pw)])
+  const u = await q1<{ email: string }>(`SELECT email FROM crm.app_users WHERE id = $1`, [userId])
+  if (!u) throw new Error('User not found.')
+  if (pw === DEFAULT_PASSWORD) throw new Error('Choose a new password, not the default one.')
+  checkPassword(pw, u.email)
+  await q(`UPDATE crm.app_users SET password_hash = $2, uses_default_password = false, session_version = session_version + 1 WHERE id = $1`, [userId, await hashPassword(pw)])
+}
+
+export async function setUsername(userId: string, raw: string) {
+  const username = cleanUsername(raw)
+  try { await q(`UPDATE crm.app_users SET email = $2 WHERE id = $1`, [userId, username]) }
+  catch (e) { if (isPgError(e, '23505')) throw new Error('That username is already taken.'); throw e }
+}
+
+export async function signOutEverywhere(userId: string) {
+  await q(`UPDATE crm.app_users SET session_version = session_version + 1 WHERE id = $1`, [userId])
 }
 
 export async function setUserActive(userId: string, active: boolean, actingUserId: string) {

@@ -1,5 +1,19 @@
 # BookMySpaces CRM v2 — Test Report
 
+**Update 22 Nov 2026 (shared login):** re-run after adding the shared `admin` login, one-click Preview setup and DB-stored session key. Results on the new commit:
+
+| Suite | Result |
+|---|---|
+| Integration tests (real database) | **72 / 72** (adds: shared login on two devices, production refuses admin/admin and weak passwords, password change signs out all devices, username change, DB-stored session key not readable by anon; 5 rounds of two simultaneous confirmations for one hall → exactly one wins each time) |
+| Browser acceptance test (real Chrome, local) | **32 / 32** (staff-permission step replaced by: two browsers signed in as `admin` at once confirm the same hall at the same moment → `won / refused`) |
+| Migration / 82-lead import / rollback / restore drill | **12 / 12** (now includes 003_shared_login.sql) |
+| Preview acceptance script, dry run on empty DB with only `CRM_DATABASE_URL` set | **21 / 21** (one-click setup → admin/admin; 82 leads: 74 new, 8 merged, 6 without phone; re-run 0 new; concurrent shared-login test) |
+| Production mode (no `CRM_ENV`), real browser | admin/admin login **refused** with “only allowed on the test copy” |
+
+Not yet run: the same scripts against a **hosted** Vercel Preview (needs the owner's Vercel/Supabase login — see DEPLOYMENT_GUIDE Part C).
+
+---
+
 Run: 22 Nov 2026 on commit 3f09ab7, in a separate test environment (local PostgreSQL 16 with Supabase-style roles and `extensions` schema, production build, real Chrome). Every test listed was executed in this run. Nothing touched production.
 
 | Suite | Result |

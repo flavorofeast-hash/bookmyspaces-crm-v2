@@ -59,9 +59,9 @@ await step('Logged-out visitor is sent to login (all six modules)', async () => 
 })
 
 await step('1. Log in (wrong password refused, right password accepted)', async () => {
-  await go('/login'); await fill('email', 'owner@demo.test'); await fill('password', 'wrong-pass'); await submit('button[type=submit]')
+  await go('/login'); await fill('email', 'admin'); await fill('password', 'wrong-pass'); await submit('button[type=submit]')
   await expectText(/incorrect/i, 'error on wrong password')
-  await fill('email', 'owner@demo.test'); await fill('password', 'Demo@12345'); await submit('button[type=submit]')
+  await fill('email', 'admin'); await fill('password', 'admin'); await submit('button[type=submit]')
   if (!page.url().includes('/today')) throw new Error('not on Today: ' + page.url())
   await expectText(/Needs attention/); await shot('01-today-desktop')
 })
@@ -292,16 +292,36 @@ await step('Old-CRM lead import is repeat-safe', async () => {
   await expectText(/already imported/); await expectText(/0 new customers/)
 })
 
-await step('Permissions: staff cannot open Settings or void payments', async () => {
-  const ctx = await browser.createBrowserContext(); const p2 = await ctx.newPage()
-  await p2.goto(BASE + '/login'); await p2.type('[name=email]', 'staff@demo.test'); await p2.type('[name=password]', 'Demo@12345')
-  await Promise.all([p2.waitForNavigation(), p2.click('button[type=submit]')])
-  await p2.goto(BASE + '/settings', { waitUntil: 'networkidle0' })
-  const t = await p2.evaluate(() => document.body.innerText)
-  if (!p2.url().includes('/today') || !t.includes('Only the owner')) throw new Error('staff reached settings: ' + p2.url())
-  await p2.goto(BASE + bookingB, { waitUntil: 'networkidle0' })
-  const voidBtns = await p2.$$('summary::-p-text(Void)'); if (voidBtns.length) throw new Error('staff sees void')
-  await ctx.close()
+await step('Shared login: two team members signed in as admin at once; same hall confirmed simultaneously → exactly one wins', async () => {
+  const D = ist(45)
+  const open = async () => {
+    const ctx = await browser.createBrowserContext(); const p = await ctx.newPage(); p.setDefaultTimeout(20000)
+    await p.goto(BASE + '/login'); await p.type('[name=email]', 'admin'); await p.type('[name=password]', 'admin')
+    await Promise.all([p.waitForNavigation(), p.click('button[type=submit]')])
+    if (!p.url().includes('/today')) throw new Error('shared login failed: ' + p.url())
+    return { ctx, p }
+  }
+  const [m1, m2] = await Promise.all([open(), open()])
+  const banner = await m1.p.evaluate(() => document.body.innerText.includes('Test login admin / admin is in use'))
+  if (!banner) throw new Error('default-password warning not shown')
+  const enquire = async ({ p }, name, phone) => {
+    await p.goto(`${BASE}/bookings/new?type=event&event_date=${D}&start_time=10:00&end_time=14:00`, { waitUntil: 'networkidle0' })
+    for (const b of await p.$$('input[name=event_ids]')) { if ((await b.evaluate((el) => el.closest('label').innerText)).includes('Celebration Hall')) { await b.click(); break } }
+    await p.$eval('[name=new_name]', (el, v) => { el.value = v }, name); await p.$eval('[name=new_phone]', (el, v) => { el.value = v }, phone)
+    await Promise.all([p.waitForNavigation({ waitUntil: 'networkidle0' }).catch(() => {}), p.click('button[name=intent][value=enquiry]')])
+    await p.waitForNetworkIdle({ idleTime: 400, timeout: 15000 }).catch(() => {})
+    const t = await p.evaluate(() => document.body.innerText); if (!/Booking saved/.test(t)) throw new Error('enquiry not saved for ' + name)
+  }
+  await Promise.all([enquire(m1, 'Concurrent One', '9876511111'), enquire(m2, 'Concurrent Two', '9876522222')])
+  const confirm = async ({ p }) => {
+    await Promise.all([p.waitForNavigation({ waitUntil: 'networkidle0' }).catch(() => {}), p.click('form button.btn-green')])
+    for (let i = 0; i < 16; i++) { const t = await p.evaluate(() => document.body.innerText); if (/Booking confirmed|Double booking prevented/.test(t)) return /Booking confirmed/.test(t) ? 'won' : 'refused'; await new Promise((r) => setTimeout(r, 500)) }
+    return 'no result'
+  }
+  const outcome = await Promise.all([confirm(m1), confirm(m2)]) // both clicks fired at the same moment
+  await m1.ctx.close(); await m2.ctx.close()
+  if (outcome.filter((o) => o === 'won').length !== 1 || outcome.filter((o) => o === 'refused').length !== 1) throw new Error('outcome: ' + outcome)
+  return outcome.join(' / ')
 })
 
 await step('Mobile layout (375×812): Today, booking, customer, inbox', async () => {
@@ -319,7 +339,7 @@ await step('Mobile layout (375×812): Today, booking, customer, inbox', async ()
 
 await step('Data persists after restart-equivalent (fresh session reads same records)', async () => {
   const ctx = await browser.createBrowserContext(); const p2 = await ctx.newPage()
-  await p2.goto(BASE + '/login'); await p2.type('[name=email]', 'owner@demo.test'); await p2.type('[name=password]', 'Demo@12345')
+  await p2.goto(BASE + '/login'); await p2.type('[name=email]', 'admin'); await p2.type('[name=password]', 'admin')
   await Promise.all([p2.waitForNavigation(), p2.click('button[type=submit]')])
   await p2.goto(BASE + customerUrl, { waitUntil: 'networkidle0' })
   const t = await p2.evaluate(() => document.body.innerText); if (!t.includes('RFN-')) throw new Error('refund not visible in new session')

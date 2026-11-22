@@ -79,6 +79,22 @@ describe('bookings', () => {
     expect((await getBooking(b.id)).status).toBe('enquiry')
   })
 
+  it('two team members confirm competing enquiries for the same hall at the same instant: exactly one wins', async () => {
+    const e = event([S.hall], '2027-01-15', '10:00', '14:00')
+    const [a, b] = await Promise.all([c1, c2].map((c) => createBooking({ customerId: c, bookingType: 'event', event: e, start: e.start, end: e.end })))
+    for (let round = 0; round < 5; round++) {
+      const res = await Promise.allSettled([setBookingStatus(a.id, 'confirmed'), setBookingStatus(b.id, 'confirmed')]) // parallel, separate DB connections
+      expect(res.filter((r) => r.status === 'fulfilled').length).toBe(1)
+      const lost = res.find((r) => r.status === 'rejected') as PromiseRejectedResult
+      expect(lost.reason).toBeInstanceOf(BookingConflictError)
+      const n = await q1<{ n: number }>(`SELECT count(*)::int AS n FROM crm.booking_items WHERE space_id = $1 AND holds AND tstzrange(start_at, end_at) && tstzrange($2::timestamptz, $3::timestamptz)`, [S.hall, e.start, e.end])
+      expect(n!.n).toBe(1)
+      const winner = res[0].status === 'fulfilled' ? a.id : b.id
+      await setBookingStatus(winner, 'cancelled', null, 'reset for next round')
+      if (round < 4) { const x = await createBooking({ customerId: c1, bookingType: 'event', event: e, start: e.start, end: e.end }); if (winner === a.id) a.id = x.id; else b.id = x.id }
+    }
+  })
+
   it('the database itself rejects a conflicting confirmed line inserted directly', async () => {
     const other = (await q1<{ id: string }>(`INSERT INTO crm.bookings (ref, customer_id, booking_type, start_at, end_at, status) VALUES ('RAW-1', $1, 'event', $2, $3, 'confirmed') RETURNING id`,
       [c2, ist('2026-12-20', '17:00'), ist('2026-12-20', '19:00')]))!.id

@@ -32,7 +32,7 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
     q<any>(`SELECT * FROM crm.spaces ORDER BY sort_order, kind, name`),
     q<any>(`SELECT id, name, start_time::text AS st, end_time::text AS et FROM crm.event_slots ORDER BY sort_order`),
     q<any>(`SELECT * FROM crm.packages ORDER BY name`),
-    q<any>(`SELECT id, name, email, role, active, last_login_at FROM crm.app_users ORDER BY created_at`),
+    q<any>(`SELECT id, name, email, role, active, last_login_at, uses_default_password FROM crm.app_users ORDER BY created_at`),
     q<any>(`SELECT * FROM crm.quick_replies ORDER BY sort_order`),
     q<any>(`SELECT * FROM crm.wa_templates ORDER BY name`),
     q1<any>(`SELECT to_regclass('public.leads') IS NOT NULL AS has_table`),
@@ -46,7 +46,7 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
       <PageHeader title="Settings" subtitle="Business details, properties, rooms and spaces, prices, staff and connections" />
       <Flash ok={searchParams.added ? `Added ${searchParams.added} space(s).` : searchParams.import ?? searchParams.ok} err={searchParams.err} />
       <nav className="flex flex-wrap gap-2 mb-4 text-sm">
-        {[['business', 'Business'], ['properties', 'Properties'], ['spaces', 'Rooms & spaces'], ['slots', 'Event time slots'], ['packages', 'Packages'], ['users', 'Staff'], ['replies', 'Quick replies'], ['templates', 'WhatsApp templates'], ['connections', 'Connections'], ['import', 'Import old leads']].map(([k, l]) => <a key={k} href={`#${k}`} className="link">{l}</a>)}
+        {[['business', 'Business'], ['properties', 'Properties'], ['spaces', 'Rooms & spaces'], ['slots', 'Event time slots'], ['packages', 'Packages'], ['users', 'Login'], ['replies', 'Quick replies'], ['templates', 'WhatsApp templates'], ['connections', 'Connections'], ['import', 'Import old leads']].map(([k, l]) => <a key={k} href={`#${k}`} className="link">{l}</a>)}
       </nav>
       <div className="space-y-4">
         <Card title="Business details" className="scroll-mt-20" >
@@ -177,25 +177,20 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
           </div>
         </Card>
 
-        <Card title="Staff accounts">
-          <div id="users" className="space-y-3">
-            <table className="table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Last sign-in</th><th></th></tr></thead>
-              <tbody>{users.map((u) => (
-                <tr key={u.id} className={u.active ? '' : 'text-slate-400'}>
-                  <td>{u.name}</td><td>{u.email}</td><td><Badge value={u.role} /></td><td className="text-xs">{u.last_login_at ? fmtDateTime(u.last_login_at) : 'never'}</td>
-                  <td className="flex flex-wrap gap-2">
-                    <Reveal label="Set password"><form action={A.resetPasswordAction} className="flex gap-2"><Hidden name="user_id" value={u.id} /><input type="password" name="password" minLength={8} required className="input" placeholder="New password" /><SubmitButton className="btn-secondary btn-sm">Save</SubmitButton></form></Reveal>
-                    <form action={A.toggleUserAction}><Hidden name="user_id" value={u.id} /><Hidden name="active" value={u.active ? 'false' : 'true'} /><SubmitButton className="btn-secondary btn-sm">{u.active ? 'Deactivate' : 'Reactivate'}</SubmitButton></form>
-                  </td>
-                </tr>))}</tbody></table>
-            <form action={A.createUserAction} className="grid sm:grid-cols-5 gap-2 items-end">
-              <Field label="Name"><input name="name" required className="input" /></Field>
-              <Field label="Email"><input type="email" name="email" required className="input" /></Field>
-              <Field label="Password (8+)"><input type="password" name="password" minLength={8} required className="input" /></Field>
-              <Field label="Role"><select name="role" className="input"><option value="staff">Staff</option><option value="owner">Owner</option></select></Field>
-              <SubmitButton>Add user</SubmitButton>
-            </form>
-            <p className="text-xs muted">Staff can do everything except Settings and voiding payments or documents.</p>
+        <Card title="Shared login">
+          <div id="users" className="space-y-3 text-sm">
+            <p className="muted">The whole team signs in with one username and password. Changing the password signs out every device.</p>
+            {users.filter((u) => u.active).map((u) => (
+              <div key={u.id} className="space-y-2">
+                <p>Username: <b className="font-mono">{u.email}</b> · last sign-in {u.last_login_at ? fmtDateTime(u.last_login_at) : 'never'}
+                  {u.uses_default_password && <span className="ml-2 text-red-700 font-medium">still using the default password</span>}</p>
+                <form action={A.changeUsernameAction} className="flex flex-wrap gap-2 items-end"><Hidden name="user_id" value={u.id} />
+                  <Field label="New username"><input name="username" required minLength={3} className="input" autoCapitalize="none" /></Field><SubmitButton className="btn-secondary">Change username</SubmitButton></form>
+                <form action={A.resetPasswordAction} className="flex flex-wrap gap-2 items-end"><Hidden name="user_id" value={u.id} />
+                  <Field label="New password"><input type="password" name="password" minLength={8} required className="input" autoComplete="new-password" /></Field><SubmitButton className="btn-secondary">Change password</SubmitButton></form>
+                <form action={A.signOutAllAction}><Hidden name="user_id" value={u.id} /><SubmitButton className="btn-secondary btn-sm">Sign out all devices</SubmitButton></form>
+              </div>))}
+            <p className="text-xs muted">The live CRM only accepts a strong password (10+ characters, not easy to guess).</p>
           </div>
         </Card>
 

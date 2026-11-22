@@ -14,8 +14,8 @@ vi.mock('next/headers', () => ({
 }))
 vi.mock('next/navigation', () => ({ redirect: (to: string) => { throw new Error('REDIRECT:' + to) } }))
 
-import { attemptLogin, getCurrentUser, requireOwner, makeSessionToken, SESSION_COOKIE } from '@/lib/auth'
-import { createUser, setUserPassword, setUserActive } from '@/lib/setup'
+import { attemptLogin, getCurrentUser, requireOwner, makeSessionToken, readSessionToken, SESSION_COOKIE, _resetSecretCache } from '@/lib/auth'
+import { createUser, setUserPassword, setUserActive, createDefaultAdmin, setUsername, signOutEverywhere } from '@/lib/setup'
 
 const form = (o: Record<string, string>) => { const f = new FormData(); for (const [k, v] of Object.entries(o)) f.set(k, v); return f }
 let ownerId = '', staffId = ''
@@ -37,8 +37,8 @@ describe('login and sessions', () => {
   })
 
   it('refuses a wrong password with a message that does not reveal whether the email exists', async () => {
-    expect(await attemptLogin('owner@test.in', 'nope')).toBe('Email or password is incorrect.')
-    expect(await attemptLogin('nobody@test.in', 'nope')).toBe('Email or password is incorrect.')
+    expect(await attemptLogin('owner@test.in', 'nope')).toBe('Username or password is incorrect.')
+    expect(await attemptLogin('nobody@test.in', 'nope')).toBe('Username or password is incorrect.')
   })
 
   it('locks an email after 10 failures in 15 minutes, even if the 11th password is right', async () => {
@@ -50,7 +50,7 @@ describe('login and sessions', () => {
   })
 
   it('a forged or tampered cookie is not accepted', async () => {
-    const good = makeSessionToken(staffId, 1)
+    const good = await makeSessionToken(staffId, 1)
     const [, sig] = good.split('.')
     jar.set(SESSION_COOKIE, Buffer.from(JSON.stringify({ u: ownerId, v: 1, e: Date.now() + 1e9 })).toString('base64url') + '.' + sig)
     expect(await getCurrentUser()).toBeNull()
@@ -65,7 +65,7 @@ describe('login and sessions', () => {
     await setUserPassword(ownerId, 'NewOwner@123')
     jar.set(SESSION_COOKIE, old)
     expect(await getCurrentUser()).toBeNull()
-    expect(await attemptLogin('owner@test.in', 'Owner@12345')).toBe('Email or password is incorrect.')
+    expect(await attemptLogin('owner@test.in', 'Owner@12345')).toBe('Username or password is incorrect.')
     expect(typeof (await attemptLogin('owner@test.in', 'NewOwner@123'))).toBe('object')
   })
 
@@ -76,7 +76,7 @@ describe('login and sessions', () => {
     await setUserActive(staffId, false, ownerId)
     jar.set(SESSION_COOKIE, staffCookie)
     expect(await getCurrentUser()).toBeNull()
-    expect(await attemptLogin('staff@test.in', 'Staff@12345')).toBe('Email or password is incorrect.')
+    expect(await attemptLogin('staff@test.in', 'Staff@12345')).toBe('Username or password is incorrect.')
     await expect(setUserActive(ownerId, false, staffId)).rejects.toThrow(/At least one active owner/)
     await expect(setUserActive(ownerId, false, ownerId)).rejects.toThrow(/your own account/)
   })
@@ -127,5 +127,68 @@ describe('database permissions (Supabase roles)', () => {
   it('the server connection (table owner) still works normally', async () => {
     const id = (await createUser(form({ name: 'Owner2', email: 'o2@test.in', password: 'Owner2@1234' }), 'owner')).id
     expect(id).toBeTruthy()
+  })
+})
+
+
+describe('shared team login (admin)', () => {
+  const envBackup = { ...process.env }
+  afterAll(() => { process.env = envBackup })
+  const setEnv = (v: string) => { (process.env as any).VERCEL_ENV = v; (process.env as any).CRM_ENV = v }
+
+  it('test copy: creates admin/admin, flagged as default; two devices signed in at once', async () => {
+    setEnv('preview')
+    await q(`DELETE FROM crm.login_failures`)
+    const a = await createDefaultAdmin()
+    jar.clear(); expect(typeof (await attemptLogin('Admin', 'admin'))).toBe('object')
+    const device1 = jar.get(SESSION_COOKIE)!
+    jar.clear(); expect(typeof (await attemptLogin('admin', 'admin'))).toBe('object')
+    const device2 = jar.get(SESSION_COOKIE)!
+    for (const c of [device1, device2]) { jar.set(SESSION_COOKIE, c); const u = await getCurrentUser(); expect(u?.id).toBe(a.id); expect(u?.uses_default_password).toBe(true) }
+  })
+
+  it('production: refuses to create admin/admin, refuses weak passwords, refuses login with the default password', async () => {
+    setEnv('production')
+    await expect(createDefaultAdmin()).rejects.toThrow(/only allowed on the test copy/)
+    await expect(createUser(form({ username: 'boss', password: 'admin' }), 'owner')).rejects.toThrow(/at least 10|too easy/)
+    await expect(createUser(form({ username: 'boss', password: 'password1' }), 'owner')).rejects.toThrow(/at least 10/)
+    const admin = await q1<{ id: string }>(`SELECT id FROM crm.app_users WHERE email = 'admin'`)
+    await expect(setUserPassword(admin!.id, 'short')).rejects.toThrow(/at least 10/)
+    expect(await attemptLogin('admin', 'admin')).toMatch(/only allowed on the test copy/)
+  })
+
+  it('changing the password clears the default flag and signs out every device', async () => {
+    setEnv('preview')
+    const admin = (await q1<{ id: string }>(`SELECT id FROM crm.app_users WHERE email = 'admin'`))!
+    jar.clear(); await attemptLogin('admin', 'admin'); const old = jar.get(SESSION_COOKIE)!
+    await expect(setUserPassword(admin.id, 'admin')).rejects.toThrow(/not the default/)
+    await setUserPassword(admin.id, 'Team-Strong-Pass-2026')
+    jar.set(SESSION_COOKIE, old); expect(await getCurrentUser()).toBeNull()
+    expect(await attemptLogin('admin', 'admin')).toBe('Username or password is incorrect.')
+    jar.clear(); await attemptLogin('admin', 'Team-Strong-Pass-2026')
+    expect((await getCurrentUser())?.uses_default_password).toBe(false)
+    setEnv('production'); jar.clear()
+    expect(typeof (await attemptLogin('admin', 'Team-Strong-Pass-2026'))).toBe('object') // strong password works live
+  })
+
+  it('username can be changed; sign-out-everywhere invalidates all sessions', async () => {
+    setEnv('preview')
+    const admin = (await q1<{ id: string }>(`SELECT id FROM crm.app_users WHERE email = 'admin'`))!
+    await expect(setUsername(admin.id, 'a b')).rejects.toThrow(/Username/)
+    await setUsername(admin.id, 'Front-Desk')
+    jar.clear(); expect(typeof (await attemptLogin('front-desk', 'Team-Strong-Pass-2026'))).toBe('object')
+    const c = jar.get(SESSION_COOKIE)!
+    await signOutEverywhere(admin.id)
+    jar.set(SESSION_COOKIE, c); expect(await getCurrentUser()).toBeNull()
+  })
+
+  it('session key is generated once, stored only in the database, and stable when SESSION_SECRET is not set', async () => {
+    delete (process.env as any).SESSION_SECRET; _resetSecretCache()
+    const t = await makeSessionToken('u-1', 1)
+    const row = await q1<{ value: string }>(`SELECT value FROM crm.app_secrets WHERE name = 'session_secret'`)
+    expect(row!.value.length).toBeGreaterThanOrEqual(60)
+    _resetSecretCache(); expect(await readSessionToken(t)).toEqual({ u: 'u-1', v: 1 })
+    const anon = await q1<{ n: number }>(`SELECT count(*)::int AS n FROM information_schema.role_table_grants WHERE table_schema='crm' AND table_name='app_secrets' AND grantee IN ('PUBLIC','anon','authenticated')`)
+    expect(anon!.n).toBe(0)
   })
 })

@@ -23,13 +23,13 @@ git push origin simplify
 Vercel then builds a **preview** for the `simplify` branch automatically. Production is not touched.
 
 ### Step 3 — Environment variables (Vercel → Project → Settings → Environment Variables)
-Add these for **Preview** first (and later Production). See `.env.example` for details.
+For **Preview** only `CRM_DATABASE_URL` is required (one-click setup, shared login admin/admin). Production also needs `CRM_SETUP_CODE` and a strong password. See `.env.example` for details.
 
 | Name | Where to get it |
 |---|---|
 | `CRM_DATABASE_URL` | Supabase → Project Settings → Database → Connection string → **Session pooler**. For a first test use a separate free Supabase project. |
-| `SESSION_SECRET` | Any random text, 32+ characters |
-| `CRM_SETUP_CODE` | A code only you know (8+ characters) |
+| `CRM_SETUP_CODE` | Production only: a code only you know (8+ characters) |
+| `SESSION_SECRET` | Optional (32+ random characters); generated automatically if empty |
 | `APP_PUBLIC_URL` | The site address, e.g. `https://bookmyspaces-crm-v2.vercel.app` |
 | `WHATSAPP_*` | Meta app (existing values) + **`WHATSAPP_APP_SECRET`** (Meta App → Settings → Basic → App secret) |
 | `META_PAGE_ID`, `META_PAGE_ACCESS_TOKEN`, `INSTAGRAM_BUSINESS_ACCOUNT_ID` | Optional, for Facebook/Instagram publishing |
@@ -38,8 +38,8 @@ Redeploy after adding them.
 
 ### Step 4 — First-time setup
 Open `<site>/setup`:
-1. Enter your setup code → **Create database tables**. This only adds the `crm` area.
-2. Create the owner account (your name, email, password).
+- **Preview / test copy:** click **Set up test copy** → tables created, shared login **admin / admin**.
+- **Production:** setup code → **Create database tables** (only adds the `crm` area) → create the shared login (username + strong password, 10+ characters).
 
 ### Step 5 — Enter your business
 **Settings** (top of the menu for the owner):
@@ -96,7 +96,7 @@ Test first with a separate **Meta test app and test number**, with its webhook s
 
 ```
 npm install
-npm run dev                 # needs CRM_DATABASE_URL + SESSION_SECRET
+npm run dev                 # needs CRM_DATABASE_URL (dev = test copy, admin/admin allowed)
 npm test                    # 66 integration tests against a real Postgres (TEST_DATABASE_URL)
 npm run db:migrate          # apply db/migrations to CRM_DATABASE_URL
 npm run db:import-leads     # same as Settings → Import old leads

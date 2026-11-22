@@ -3,7 +3,7 @@
 // Usage: CRM_DATABASE_URL=<test db> npm run db:seed-sample
 import { pool, q, q1 } from '../src/lib/db'
 import { applyMigrations } from '../src/lib/migrate'
-import { createUser } from '../src/lib/setup'
+import { createDefaultAdmin } from '../src/lib/setup'
 import { createCustomer, addFollowUp, importLegacyLeads } from '../src/lib/customers'
 import { createBooking, setBookingStatus } from '../src/lib/bookings'
 import { issueStatement, recordPayment, recordRefund } from '../src/lib/billing'
@@ -22,9 +22,7 @@ async function main() {
            email='hello@bookmyspaces.in', whatsapp_number='919051459463', upi_id='bookmyspaces@upi', bank_details='Sample Bank · A/C 000000000000 · IFSC SAMP0000001',
            document_footer='Thank you for choosing BookMySpaces! (sample document)' WHERE id = 1`)
 
-  const of = new FormData(); of.set('name', 'Demo Owner'); of.set('email', 'owner@demo.test'); of.set('password', 'Demo@12345')
-  const owner = await createUser(of, 'owner')
-  { const f = new FormData(); f.set('name', 'Demo Reception'); f.set('email', 'staff@demo.test'); f.set('password', 'Demo@12345'); f.set('role', 'staff'); await createUser(f) }
+  const owner = await createDefaultAdmin() // shared test login admin / admin (refused in production)
   const uid = owner.id
 
   const prop = async (name: string, address: string, sort: number) => (await q1<{ id: string }>(`INSERT INTO crm.properties (name, address, sort_order) VALUES ($1,$2,$3) RETURNING id`, [name, address, sort]))!.id
