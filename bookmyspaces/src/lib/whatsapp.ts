@@ -1,3 +1,4 @@
+import { metaEnv } from './env'
 import { createHmac, timingSafeEqual } from 'crypto'
 import { q, q1, tx, type Db } from './db'
 import { normalizePhone, formatPhone } from './phone'
@@ -9,13 +10,13 @@ export function graphBase(): string {
 
 export function waStatus() {
   return {
-    canSend: Boolean(process.env.WHATSAPP_ACCESS_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
-    canReceive: Boolean(process.env.WHATSAPP_APP_SECRET && process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN),
+    canSend: Boolean(metaEnv('WHATSAPP_ACCESS_TOKEN') && metaEnv('WHATSAPP_PHONE_NUMBER_ID')),
+    canReceive: Boolean(metaEnv('WHATSAPP_APP_SECRET') && metaEnv('WHATSAPP_WEBHOOK_VERIFY_TOKEN')),
   }
 }
 
 /** Meta signs every webhook POST with the app secret (X-Hub-Signature-256: sha256=<hex>). */
-export function verifySignature(rawBody: string, header: string | null, secret = process.env.WHATSAPP_APP_SECRET): boolean {
+export function verifySignature(rawBody: string, header: string | null, secret = metaEnv('WHATSAPP_APP_SECRET')): boolean {
   if (!secret || !header || !header.startsWith('sha256=')) return false
   const expected = createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex')
   const given = header.slice(7)
@@ -177,9 +178,9 @@ type SendResult = { ok: boolean; messageId: string; error?: string }
 
 async function callGraph(body: unknown): Promise<{ ok: true; waId: string } | { ok: false; code: string; message: string }> {
   try {
-    const res = await fetch(`${graphBase()}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+    const res = await fetch(`${graphBase()}/${metaEnv('WHATSAPP_PHONE_NUMBER_ID')}/messages`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${metaEnv('WHATSAPP_ACCESS_TOKEN')}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(15_000),
     })

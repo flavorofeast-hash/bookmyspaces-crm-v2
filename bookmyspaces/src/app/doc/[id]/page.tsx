@@ -1,3 +1,4 @@
+import { appPublicUrl } from '@/lib/env'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireUser } from '@/lib/auth'
@@ -12,7 +13,7 @@ export default async function DocPage(props: { params: Promise<{ id: string }> }
   await requireUser()
   const doc = await getDocument({ id: params.id }).catch(() => null)
   if (!doc) notFound()
-  const base = process.env.APP_PUBLIC_URL?.replace(/\/$/, '')
+  const base = appPublicUrl()
   return (
     <div className="min-h-screen bg-slate-100 print:bg-white">
       <div className="no-print flex flex-wrap items-center gap-2 max-w-3xl mx-auto p-3">

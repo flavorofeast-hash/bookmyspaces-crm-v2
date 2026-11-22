@@ -1,3 +1,4 @@
+import { metaEnv, appPublicUrl } from './env'
 import { randomBytes } from 'crypto'
 import { q, q1 } from './db'
 import { graphBase } from './whatsapp'
@@ -86,7 +87,7 @@ async function graphGet(path: string, token: string): Promise<any> {
 }
 
 export async function facebookConnection(): Promise<ConnState> {
-  const id = process.env.META_PAGE_ID, token = process.env.META_PAGE_ACCESS_TOKEN
+  const id = metaEnv('META_PAGE_ID'), token = metaEnv('META_PAGE_ACCESS_TOKEN')
   if (!id || !token) return { configured: false, ok: false, detail: 'Not connected: META_PAGE_ID and META_PAGE_ACCESS_TOKEN are not set.' }
   try {
     const j = await graphGet(`${id}?fields=id,name`, token)
@@ -97,9 +98,9 @@ export async function facebookConnection(): Promise<ConnState> {
 }
 
 export async function instagramConnection(): Promise<ConnState> {
-  const id = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID, token = process.env.META_PAGE_ACCESS_TOKEN
+  const id = metaEnv('INSTAGRAM_BUSINESS_ACCOUNT_ID'), token = metaEnv('META_PAGE_ACCESS_TOKEN')
   if (!id || !token) return { configured: false, ok: false, detail: 'Not connected: INSTAGRAM_BUSINESS_ACCOUNT_ID and META_PAGE_ACCESS_TOKEN are not set.' }
-  if (!process.env.APP_PUBLIC_URL) return { configured: true, ok: false, detail: 'APP_PUBLIC_URL is not set — Instagram must be able to download the image from this site.' }
+  if (!appPublicUrl()) return { configured: true, ok: false, detail: 'APP_PUBLIC_URL is not set — Instagram must be able to download the image from this site.' }
   try {
     const j = await graphGet(`${id}?fields=id,username`, token)
     return { configured: true, ok: true, detail: `Connected to Instagram @${j.username}` }
@@ -118,7 +119,7 @@ async function record(postId: string, platform: string, r: { ok: true; id: strin
 export async function publishFacebook(postId: string, userId?: string | null) {
   const post = await q1<any>(`SELECT p.caption, m.bytes, m.mime, m.filename FROM crm.posts p LEFT JOIN crm.media m ON m.id = p.media_id WHERE p.id = $1`, [postId])
   if (!post) throw new Error('Post not found.')
-  const pageId = process.env.META_PAGE_ID, token = process.env.META_PAGE_ACCESS_TOKEN
+  const pageId = metaEnv('META_PAGE_ID'), token = metaEnv('META_PAGE_ACCESS_TOKEN')
   if (!pageId || !token) throw new Error('Facebook is not connected.')
   let result: { ok: true; id: string; permalink: string | null } | { ok: false; error: string }
   try {
@@ -152,7 +153,7 @@ export async function publishInstagram(postId: string, userId?: string | null) {
   const post = await q1<any>(`SELECT p.caption, m.public_token FROM crm.posts p LEFT JOIN crm.media m ON m.id = p.media_id WHERE p.id = $1`, [postId])
   if (!post) throw new Error('Post not found.')
   if (!post.public_token) throw new Error('Instagram posts need an image.')
-  const ig = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID, token = process.env.META_PAGE_ACCESS_TOKEN, base = process.env.APP_PUBLIC_URL
+  const ig = metaEnv('INSTAGRAM_BUSINESS_ACCOUNT_ID'), token = metaEnv('META_PAGE_ACCESS_TOKEN'), base = appPublicUrl()
   if (!ig || !token || !base) throw new Error('Instagram is not connected.')
   if ((post.caption ?? '').length > 2200) throw new Error('Instagram captions can be at most 2,200 characters.')
   let result: { ok: true; id: string; permalink: string | null } | { ok: false; error: string }

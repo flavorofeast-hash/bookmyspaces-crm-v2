@@ -1,3 +1,4 @@
+import { appPublicUrl } from '@/lib/env'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getBooking, listSpaces } from '@/lib/bookings'
@@ -26,7 +27,7 @@ export default async function BookingPage(props: { params: Promise<{ id: string 
   const liveQuote = b.documents.find((d: any) => d.doc_type === 'quotation' && d.status === 'issued')
   const liveBill = b.documents.find((d: any) => d.doc_type === 'bill' && d.status === 'issued')
   const newReceipt = searchParams.receipt ? b.documents.find((d: any) => d.id === searchParams.receipt) : null
-  const appUrl = process.env.APP_PUBLIC_URL?.replace(/\/$/, '')
+  const appUrl = appPublicUrl()
   const shareText = (d: any) => `${DOC_LABEL[d.doc_type]} ${d.number} from BookMySpaces${appUrl ? `: ${appUrl}/d/${d.public_token}` : ''}`
   const wa = (d: any) => waLink(b.customer_whatsapp ?? b.customer_phone, shareText(d))
   const back = `/bookings/${b.id}`

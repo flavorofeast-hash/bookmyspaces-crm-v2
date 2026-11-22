@@ -1,3 +1,4 @@
+import { metaEnv } from '@/lib/env'
 import { NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
 import { verifySignature, processWebhook } from '@/lib/whatsapp'
@@ -9,7 +10,7 @@ export const runtime = 'nodejs'
 // Meta's one-time verification handshake.
 export async function GET(req: Request) {
   const u = new URL(req.url)
-  const token = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN ?? ''
+  const token = metaEnv('WHATSAPP_WEBHOOK_VERIFY_TOKEN') ?? ''
   const given = u.searchParams.get('hub.verify_token') ?? ''
   const ok = token.length > 0 && given.length === token.length && timingSafeEqual(Buffer.from(given), Buffer.from(token))
   if (u.searchParams.get('hub.mode') === 'subscribe' && ok) return new NextResponse(u.searchParams.get('hub.challenge') ?? '', { status: 200 })
@@ -19,7 +20,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const raw = await req.text()
   // Security: every POST must carry Meta's signature made with our app secret.
-  if (!process.env.WHATSAPP_APP_SECRET) return new NextResponse('Webhook not configured', { status: 503 })
+  if (!metaEnv('WHATSAPP_APP_SECRET')) return new NextResponse('Webhook not configured', { status: 503 })
   if (!verifySignature(raw, req.headers.get('x-hub-signature-256'))) return new NextResponse('Invalid signature', { status: 401 })
   if (!isDbConfigured()) return new NextResponse('Database not configured', { status: 503 })
   let payload: unknown

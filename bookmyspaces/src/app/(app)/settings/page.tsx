@@ -1,3 +1,4 @@
+import { metaEnv, appPublicUrl } from '@/lib/env'
 import { requireOwner } from '@/lib/auth'
 import { q, q1 } from '@/lib/db'
 import { getSettings } from '@/lib/setup'
@@ -40,7 +41,7 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
   const legacyCount = legacy?.has_table ? (await q1<{ n: number }>(`SELECT count(*)::int AS n FROM public.leads`))!.n : 0
   const imported = (await q1<{ n: number }>(`SELECT count(*)::int AS n FROM (SELECT unnest(legacy_lead_ids) FROM crm.customers) x`))!.n
   const wa = waStatus()
-  const env = (k: string) => Boolean(process.env[k])
+  const env = (k: string) => Boolean(k === 'APP_PUBLIC_URL' ? appPublicUrl() : metaEnv(k))
   return (
     <>
       <PageHeader title="Settings" subtitle="Business details, properties, rooms and spaces, prices, staff and connections" />
