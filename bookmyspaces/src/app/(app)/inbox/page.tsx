@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/auth'
 import Link from 'next/link'
 import { conversations } from '@/lib/whatsapp'
 import { WaBanner } from '@/components/wa-banner'
@@ -6,6 +7,7 @@ import { fmtDateTime } from '@/lib/format'
 import { formatPhone } from '@/lib/phone'
 
 export default async function InboxPage(props: { searchParams: Promise<{ ok?: string; err?: string }> }) {
+  await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const searchParams = await props.searchParams
   const rows = await conversations()
   return (

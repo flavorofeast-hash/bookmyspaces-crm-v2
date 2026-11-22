@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/auth'
 import Link from 'next/link'
 import { listBookings, listSpaces, calendarItems } from '@/lib/bookings'
 import { PageHeader, Card, Flash, Badge, Empty } from '@/components/ui'
@@ -47,6 +48,7 @@ async function Calendar({ from }: { from: string }) {
 }
 
 export default async function BookingsPage(props: { searchParams: Promise<SP> }) {
+  await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const sp = await props.searchParams
   const view = sp.view === 'list' ? 'list' : 'calendar'
   const from = sp.from && /^\d{4}-\d{2}-\d{2}$/.test(sp.from) ? sp.from : istDate()

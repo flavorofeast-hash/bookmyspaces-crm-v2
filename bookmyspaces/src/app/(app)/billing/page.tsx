@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/auth'
 import Link from 'next/link'
 import { q, q1 } from '@/lib/db'
 import { PageHeader, Card, Flash, Badge, Empty, Stat } from '@/components/ui'
@@ -6,6 +7,7 @@ import { inr, fmtDate, fmtDateTime, DOC_LABEL, PAYMENT_KIND_LABEL, PAYMENT_METHO
 type SP = { tab?: string; type?: string; ok?: string; err?: string }
 
 export default async function BillingPage(props: { searchParams: Promise<SP> }) {
+  await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const sp = await props.searchParams
   const tab = ['documents', 'transactions'].includes(sp.tab ?? '') ? sp.tab! : 'outstanding'
   const totals = await q1<any>(`SELECT

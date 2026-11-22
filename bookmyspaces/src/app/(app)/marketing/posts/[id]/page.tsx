@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { q, q1 } from '@/lib/db'
@@ -10,6 +11,7 @@ import { fmtDateTime } from '@/lib/format'
 const PL: Record<string, string> = { facebook: 'Facebook', instagram: 'Instagram', google: 'Google Business' }
 
 export default async function PostPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
+  await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const params = await props.params
   const searchParams = await props.searchParams
   const isNew = params.id === 'new'

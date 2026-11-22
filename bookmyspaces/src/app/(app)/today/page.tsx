@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/auth'
 import Link from 'next/link'
 import { todayData } from '@/lib/today'
 import { completeFollowUpAction } from '../customers/actions'
@@ -7,6 +8,7 @@ import { inr, fmtDate, fmtTime, fmtDay, fmtDateTime, SOURCE_LABEL, STATUS_LABEL 
 import { formatPhone } from '@/lib/phone'
 
 export default async function TodayPage(props: { searchParams: Promise<{ ok?: string; err?: string }> }) {
+  await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const searchParams = await props.searchParams
   const d = await todayData()
   const free = d.spaces.filter((s) => !s.busy)

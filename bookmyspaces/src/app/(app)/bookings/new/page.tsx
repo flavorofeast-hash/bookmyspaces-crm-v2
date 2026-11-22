@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/auth'
 import Link from 'next/link'
 import { q, q1 } from '@/lib/db'
 import { availability, type AvailabilitySpace } from '@/lib/bookings'
@@ -36,6 +37,7 @@ function SpaceList({ spaces, name, unit }: { spaces: AvailabilitySpace[]; name: 
 }
 
 export default async function NewBookingPage(props: { searchParams: Promise<SP> }) {
+  await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const sp = await props.searchParams
   const type = (['room_stay', 'event', 'event_with_stay'].includes(sp.type ?? '') ? sp.type : 'event') as string
   const [customer, slots, packages, recent, settings] = await Promise.all([

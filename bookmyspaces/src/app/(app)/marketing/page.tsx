@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/auth'
 import Link from 'next/link'
 import { q1 } from '@/lib/db'
 import { campaignStats, listPosts, trackingLink } from '@/lib/marketing'
@@ -9,6 +10,7 @@ import { inr, fmtDate } from '@/lib/format'
 const PL: Record<string, string> = { facebook: 'Facebook', instagram: 'Instagram', google: 'Google Business' }
 
 export default async function MarketingPage(props: { searchParams: Promise<{ ok?: string; err?: string }> }) {
+  await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const searchParams = await props.searchParams
   const [campaigns, posts, s] = await Promise.all([campaignStats(), listPosts(), q1<any>(`SELECT whatsapp_number, business_name FROM crm.business_settings WHERE id = 1`)])
   const byMonth = posts.reduce<Record<string, any[]>>((a, p) => { const k = p.planned_for ? fmtDate(p.planned_for).replace(/^\d+ /, '') : 'Not scheduled'; (a[k] ??= []).push(p); return a }, {})

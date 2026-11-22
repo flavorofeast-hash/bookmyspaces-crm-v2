@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { q } from '@/lib/db'
@@ -10,6 +11,7 @@ import { formatPhone, waLink } from '@/lib/phone'
 import { inr, fmtDate, fmtDateTime, STATUS_LABEL, BOOKING_TYPE_LABEL, SOURCE_LABEL, PAYMENT_KIND_LABEL, PAYMENT_METHOD_LABEL, DOC_LABEL, istDate, addDays } from '@/lib/format'
 
 export default async function CustomerPage(props: { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
+  await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const params = await props.params
   const searchParams = await props.searchParams
   const c = await getCustomer(params.id).catch(() => null)

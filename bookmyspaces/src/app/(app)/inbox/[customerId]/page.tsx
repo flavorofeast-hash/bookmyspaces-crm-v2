@@ -1,3 +1,4 @@
+import { requireUser } from '@/lib/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { q, q1 } from '@/lib/db'
@@ -12,6 +13,7 @@ import { formatPhone, waLink } from '@/lib/phone'
 const TYPE_LABEL: Record<string, string> = { image: '📷 Photo', audio: '🎤 Voice note', video: '🎬 Video', document: '📄 Document', location: '📍 Location', sticker: 'Sticker', contacts: '👤 Contact' }
 
 export default async function ThreadPage(props: { params: Promise<{ customerId: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
+  await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const params = await props.params
   const searchParams = await props.searchParams
   const c = await q1<any>(`SELECT id, name, phone, whatsapp FROM crm.customers WHERE id = $1`, [params.customerId]).catch(() => null)
