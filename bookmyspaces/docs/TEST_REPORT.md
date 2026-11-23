@@ -1,3 +1,25 @@
+# Production go-live — 23 Nov 2026 (https://bookmyspaces-crm-next.vercel.app, V2's own database)
+
+Import: V3 read-only export (signed in to V3 as flavor.of.east@gmail.com; nothing changed in V3). 85 leads exported; 10 demo/test + 9 internal-test leads excluded; **66 imported** (19 without phone, flagged). Re-run: 0 new, 66 already imported. Full export (85 leads, 27 proposals, 21 invoices, 10 payments, 7 packages, 237 activity logs) saved to Desktop `bookmyspaces_v3_export_2026-11-23.json`.
+
+| Test (real production site, real database) | Result |
+|---|---|
+| Public setup locked; setup only on protected deployment URL; admin/admin refused | PASS |
+| Forged session cookie on all pages → login redirect | PASS |
+| Lead import + duplicate re-run | PASS |
+| Customer creation inline + search by name and phone | PASS |
+| Hall + 2 rooms booking (₹7,000 total) | PASS |
+| Two tabs, same shared login, confirm same hall at the same instant → one confirmed, other "Double booking prevented" | PASS |
+| Quotation QT, advance → receipt RCP, final bill BILL, balance → ₹0 | PASS |
+| Cancel (reason required) → refund ≤ paid → refund note RFN; hall freed → other booking confirms | PASS |
+| Mobile 375px, no horizontal overflow | PASS |
+| Data persists (verified in database after the session) | PASS |
+| Logout/login on production | Not run (needs the owner's password; verified on Preview) |
+
+Test records are labelled "ZZ TEST" (2 customers, 2 cancelled bookings, test property/spaces deactivated). They used document numbers QT/BILL/RFN-2026-0001 and RCP-2026-0001/0002.
+
+---
+
 # Hosted Preview acceptance — 22 Nov 2026 (real Vercel Preview, real Supabase test DB)
 
 - URL: https://bookmyspaces-crm-next-git-simplify-raju1605jobs-hashs-projects.vercel.app (Vercel project `bookmyspaces-crm-next`, fork `flavorofeast-hash/bookmyspaces-crm-v2`, branch `simplify`, commit 000ea2d)
