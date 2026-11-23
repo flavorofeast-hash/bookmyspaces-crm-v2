@@ -138,3 +138,19 @@ describe('bookings', () => {
     await expect(setBookingStatus(a.id, 'completed')).rejects.toThrow(/cannot be changed/)
   })
 })
+
+describe('inventory: not-configured spaces', () => {
+  it('a space without a price, or inactive, can never be booked or confirmed', async () => {
+    const prop = (await q1<{ id: string }>(`SELECT property_id AS id FROM crm.spaces WHERE id = $1`, [S.hall]))!.id
+    const nc = (await q1<{ id: string }>(`INSERT INTO crm.spaces (property_id, name, kind, price_unit) VALUES ($1,'Hall NC','hall','slot') RETURNING id`, [prop]))!.id
+    const e = event([nc], '2027-03-01', '10:00', '14:00')
+    await expect(createBooking({ customerId: c1, bookingType: 'event', event: e, start: e.start, end: e.end })).rejects.toThrow(/not configured/)
+    const av = await availability(e.start, e.end)
+    expect(av.find((s) => s.id === nc)?.status).toBe('not_configured')
+    // priced later → bookable; then deactivated → confirmation refused by the database
+    await q(`UPDATE crm.spaces SET price = 1000 WHERE id = $1`, [nc])
+    const b = await createBooking({ customerId: c1, bookingType: 'event', event: e, start: e.start, end: e.end })
+    await q(`UPDATE crm.spaces SET active = false WHERE id = $1`, [nc])
+    await expect(setBookingStatus(b.id, 'confirmed')).rejects.toThrow(/not configured/)
+  })
+})

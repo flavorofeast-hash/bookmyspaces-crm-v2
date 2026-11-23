@@ -20,11 +20,11 @@ function SpaceList({ spaces, name, unit }: { spaces: AvailabilitySpace[]; name: 
           <div className="text-xs font-semibold muted mb-1.5">{prop}</div>
           <div className="grid sm:grid-cols-2 gap-2">
             {list.map((s) => (
-              <label key={s.id} className={`flex items-start gap-2 rounded-lg border p-2.5 text-sm ${s.status === 'booked' ? 'bg-red-50 border-red-200 opacity-80' : s.status === 'tentative' ? 'border-amber-300' : 'border-slate-200 hover:border-brand-500'}`}>
-                <input type="checkbox" name={name} value={s.id} disabled={s.status === 'booked'} className="mt-1" />
+              <label key={s.id} className={`flex items-start gap-2 rounded-lg border p-2.5 text-sm ${s.status === 'booked' ? 'bg-red-50 border-red-200 opacity-80' : s.status === 'not_configured' ? 'bg-slate-50 border-slate-200 opacity-60' : s.status === 'tentative' ? 'border-amber-300' : 'border-slate-200 hover:border-brand-500'}`}>
+                <input type="checkbox" name={name} value={s.id} disabled={s.status === 'booked' || s.status === 'not_configured'} className="mt-1" />
                 <span className="flex-1">
-                  <span className="font-medium">{s.name}</span> <Badge value={s.status} label={s.status === 'free' ? 'Free' : s.status === 'booked' ? 'Booked' : 'Enquiry pending'} />
-                  <span className="block text-xs muted">{[s.room_type, s.capacity ? `up to ${s.capacity}` : null, `${inr(s.price)}/${s.price_unit}`].filter(Boolean).join(' · ')}</span>
+                  <span className="font-medium">{s.name}</span> <Badge value={s.status} label={s.status === 'free' ? 'Free' : s.status === 'booked' ? 'Booked' : s.status === 'not_configured' ? 'Not configured' : 'Enquiry pending'} />
+                  <span className="block text-xs muted">{[s.room_type, s.capacity ? `up to ${s.capacity}` : null, s.price === null ? 'price NOT CONFIGURED' : `${inr(s.price)}/${s.price_unit}`].filter(Boolean).join(' · ')}</span>
                   {s.conflicts.map((c) => <span key={c.booking_id + c.start_at} className="block text-xs text-slate-600">{c.ref} · {c.customer} · {fmtDateTime(c.start_at)} – {fmtDateTime(c.end_at)} ({c.status})</span>)}
                 </span>
               </label>
@@ -43,7 +43,8 @@ export default async function NewBookingPage(props: { searchParams: Promise<SP> 
   const [customer, slots, packages, recent, settings] = await Promise.all([
     sp.customer ? q1<any>(`SELECT id, name, phone FROM crm.customers WHERE id = $1`, [sp.customer]).catch(() => null) : null,
     q<any>(`SELECT id, name, start_time::text AS st, end_time::text AS et FROM crm.event_slots ORDER BY sort_order`),
-    q<any>(`SELECT id, name, price, price_basis FROM crm.packages WHERE active ORDER BY name`),
+    q<any>(`SELECT pk.id, pk.name, pk.price, pk.price_basis FROM crm.packages pk LEFT JOIN crm.properties p ON p.id = pk.property_id
+      WHERE pk.active AND pk.price IS NOT NULL AND (pk.property_id IS NULL OR p.food_packages_enabled) ORDER BY pk.name`),
     sp.customer ? [] : q<any>(`SELECT id, name, phone FROM crm.customers ORDER BY updated_at DESC LIMIT 300`),
     q1<any>(`SELECT checkin_time::text AS ci, checkout_time::text AS co FROM crm.business_settings WHERE id = 1`),
   ])

@@ -26,8 +26,10 @@ export async function saveProperty(f: FormData) {
   const id = s(f.get('id')), name = s(f.get('name'))
   if (!name) throw new Error('Property name is required.')
   try {
-    if (id) await q(`UPDATE crm.properties SET name=$2, address=$3, phone=$4, notes=$5, active=$6, sort_order=COALESCE($7, sort_order) WHERE id=$1`,
-      [id, name, s(f.get('address')), s(f.get('phone')), s(f.get('notes')), f.get('active') !== 'off', n(f.get('sort_order'))])
+    if (id) await q(`UPDATE crm.properties SET name=$2, address=$3, phone=$4, notes=$5, active=$6, sort_order=COALESCE($7, sort_order),
+        food_packages_enabled=$8, booking_rules=$9 WHERE id=$1`,
+      [id, name, s(f.get('address')), s(f.get('phone')), s(f.get('notes')), f.get('active') !== 'off', n(f.get('sort_order')),
+        f.get('food_packages_enabled') === 'on', s(f.get('booking_rules'))])
     else await q(`INSERT INTO crm.properties (name, address, phone, notes, sort_order) VALUES ($1,$2,$3,$4,COALESCE($5,0))`,
       [name, s(f.get('address')), s(f.get('phone')), s(f.get('notes')), n(f.get('sort_order'))])
   } catch (e) {
@@ -48,8 +50,10 @@ export async function addSpaces(f: FormData): Promise<number> {
   let added = 0
   for (const name of names) {
     try {
-      await q(`INSERT INTO crm.spaces (property_id, name, kind, room_type, capacity, facilities, price, price_unit) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [propertyId, name, kind, s(f.get('room_type')), n(f.get('capacity')), s(f.get('facilities')), n(f.get('price')) ?? 0, unit])
+      await q(`INSERT INTO crm.spaces (property_id, name, kind, room_type, capacity, facilities, price, price_unit, description, max_occupancy, booking_rules)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+        [propertyId, name, kind, s(f.get('room_type')), n(f.get('capacity')), s(f.get('facilities')), n(f.get('price')), unit,
+          s(f.get('description')), n(f.get('max_occupancy')), s(f.get('booking_rules'))])
       added++
     } catch (e) {
       if (isPgError(e, '23505')) throw new Error(`“${name}” already exists in this property${added ? ` (added ${added} before it)` : ''}.`)
@@ -63,9 +67,10 @@ export async function updateSpace(f: FormData) {
   const id = s(f.get('id')), name = s(f.get('name'))
   if (!id || !name) throw new Error('Name is required.')
   try {
-    await q(`UPDATE crm.spaces SET name=$2, kind=$3, room_type=$4, capacity=$5, facilities=$6, price=$7, price_unit=$8, active=$9 WHERE id=$1`,
-      [id, name, s(f.get('kind')) ?? 'room', s(f.get('room_type')), n(f.get('capacity')), s(f.get('facilities')), n(f.get('price')) ?? 0,
-        s(f.get('price_unit')) ?? 'night', f.get('active') === 'on'])
+    await q(`UPDATE crm.spaces SET name=$2, kind=$3, room_type=$4, capacity=$5, facilities=$6, price=$7, price_unit=$8, active=$9,
+        description=$10, max_occupancy=$11, booking_rules=$12 WHERE id=$1`,
+      [id, name, s(f.get('kind')) ?? 'room', s(f.get('room_type')), n(f.get('capacity')), s(f.get('facilities')), n(f.get('price')),
+        s(f.get('price_unit')) ?? 'night', f.get('active') === 'on', s(f.get('description')), n(f.get('max_occupancy')), s(f.get('booking_rules'))])
   } catch (e) {
     if (isPgError(e, '23505')) throw new Error(`Another space in this property is already called “${name}”.`)
     throw e
@@ -75,10 +80,11 @@ export async function updateSpace(f: FormData) {
 export async function savePackage(f: FormData) {
   const id = s(f.get('id')), name = s(f.get('name'))
   if (!name) throw new Error('Package name is required.')
-  const vals = [name, s(f.get('description')), n(f.get('price')) ?? 0, s(f.get('price_basis')) ?? 'per_person', f.get('active') !== 'off']
+  const vals = [name, s(f.get('description')), n(f.get('price')), s(f.get('price_basis')) ?? 'per_person', f.get('active') !== 'off',
+    s(f.get('property_id')), n(f.get('min_guests')), s(f.get('add_ons'))]
   try {
-    if (id) await q(`UPDATE crm.packages SET name=$2, description=$3, price=$4, price_basis=$5, active=$6 WHERE id=$1`, [id, ...vals])
-    else await q(`INSERT INTO crm.packages (name, description, price, price_basis, active) VALUES ($1,$2,$3,$4,$5)`, vals)
+    if (id) await q(`UPDATE crm.packages SET name=$2, description=$3, price=$4, price_basis=$5, active=$6, property_id=$7, min_guests=$8, add_ons=$9 WHERE id=$1`, [id, ...vals])
+    else await q(`INSERT INTO crm.packages (name, description, price, price_basis, active, property_id, min_guests, add_ons) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, vals)
   } catch (e) {
     if (isPgError(e, '23505')) throw new Error(`A package named “${name}” already exists.`)
     throw e

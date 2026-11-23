@@ -15,6 +15,7 @@ export async function applyMigrations(pool: Pool, dir = migrationsDir()): Promis
   const client = await pool.connect()
   const applied: string[] = []
   try {
+    await client.query(`SELECT pg_advisory_lock(727274001)`) // one migrator at a time (serverless instances may start together)
     await client.query(`CREATE SCHEMA IF NOT EXISTS crm`)
     await client.query(`CREATE TABLE IF NOT EXISTS crm.schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`)
     const done = new Set((await client.query(`SELECT version FROM crm.schema_migrations`)).rows.map((r) => r.version))
@@ -33,6 +34,7 @@ export async function applyMigrations(pool: Pool, dir = migrationsDir()): Promis
       }
     }
   } finally {
+    await client.query(`SELECT pg_advisory_unlock(727274001)`).catch(() => {})
     client.release()
   }
   return applied

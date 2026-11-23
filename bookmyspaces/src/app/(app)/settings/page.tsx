@@ -15,11 +15,14 @@ function SpaceFields({ s }: { s?: any }) {
   return (
     <>
       <Field label="Type"><select name="kind" defaultValue={s?.kind ?? 'room'} className="input">{Object.entries(KINDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
-      <Field label="Room type / description"><input name="room_type" defaultValue={s?.room_type ?? ''} placeholder="Deluxe AC, Banquet…" className="input" /></Field>
-      <Field label="Capacity (guests)"><input type="number" name="capacity" min={0} defaultValue={s?.capacity ?? ''} className="input" /></Field>
-      <Field label="Price (₹)"><input type="number" name="price" min={0} step="1" defaultValue={s ? Number(s.price) : ''} className="input" /></Field>
+      <Field label="Category"><input name="room_type" defaultValue={s?.room_type ?? ''} placeholder="NOT CONFIGURED (e.g. Deluxe AC)" className="input" /></Field>
+      <Field label="Capacity (guests)"><input type="number" name="capacity" min={0} defaultValue={s?.capacity ?? ''} placeholder="NOT CONFIGURED" className="input" /></Field>
+      <Field label="Max occupancy"><input type="number" name="max_occupancy" min={0} defaultValue={s?.max_occupancy ?? ''} placeholder="NOT CONFIGURED" className="input" /></Field>
+      <Field label="Price / rate (₹)" hint="Leave empty until known — it cannot be booked without a price"><input type="number" name="price" min={0} step="1" defaultValue={s && s.price !== null ? Number(s.price) : ''} placeholder="NOT CONFIGURED" className="input" /></Field>
       <Field label="Price is"><select name="price_unit" defaultValue={s?.price_unit ?? 'night'} className="input">{Object.entries(UNITS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
-      <Field label="Facilities"><input name="facilities" defaultValue={s?.facilities ?? ''} placeholder="AC, TV, balcony, projector…" className="input" /></Field>
+      <Field label="Facilities & amenities"><input name="facilities" defaultValue={s?.facilities ?? ''} placeholder="NOT CONFIGURED (e.g. AC, TV)" className="input" /></Field>
+      <Field label="Description"><input name="description" defaultValue={s?.description ?? ''} placeholder="NOT CONFIGURED" className="input" /></Field>
+      <Field label="Booking rules"><input name="booking_rules" defaultValue={s?.booking_rules ?? ''} placeholder="e.g. min 2 nights, no events after 10 pm" className="input" /></Field>
     </>
   )
 }
@@ -79,6 +82,8 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
                 <Field label="Address" className="sm:col-span-2"><input name="address" defaultValue={p.address ?? ''} className="input" /></Field>
                 <Field label="Active"><select name="active" defaultValue={p.active ? 'on' : 'off'} className="input"><option value="on">Active</option><option value="off">Hidden</option></select></Field>
                 <SubmitButton className="btn-secondary">Save</SubmitButton>
+                <Field label="Booking rules" className="sm:col-span-4"><input name="booking_rules" defaultValue={p.booking_rules ?? ''} placeholder="e.g. check-in 2 pm, no outside food, music until 10 pm" className="input" /></Field>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="food_packages_enabled" defaultChecked={p.food_packages_enabled} /> Food packages</label>
               </form>
             ))}
             <form action={A.savePropertyAction} className="grid sm:grid-cols-5 gap-2 items-end">
@@ -102,8 +107,9 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
                       <thead><tr><th>Name</th><th>Type</th><th>Capacity</th><th>Price</th><th>Facilities</th><th>Status</th><th></th></tr></thead>
                       <tbody>{list.map((x) => (
                         <tr key={x.id} className={x.active ? '' : 'text-slate-400'}>
-                          <td className="font-medium">{x.name}</td><td>{KINDS[x.kind]}{x.room_type ? ` · ${x.room_type}` : ''}</td><td>{x.capacity ?? ''}</td>
-                          <td>{inr(x.price)} {UNITS[x.price_unit]}</td><td className="text-xs">{x.facilities ?? ''}</td><td>{x.active ? 'Active' : 'Hidden'}</td>
+                          <td className="font-medium">{x.name}</td><td>{KINDS[x.kind]} · {x.room_type ?? <span className="text-amber-700">category not configured</span>}</td><td>{x.capacity ?? <span className="text-amber-700">NOT CONFIGURED</span>}</td>
+                          <td>{x.price === null ? <span className="text-amber-700">NOT CONFIGURED</span> : <>{inr(x.price)} {UNITS[x.price_unit]}</>}</td><td className="text-xs">{x.facilities ?? <span className="text-amber-700">NOT CONFIGURED</span>}</td>
+                          <td>{!x.active ? 'Hidden' : x.price === null ? <span className="text-amber-700">Not bookable (no price)</span> : 'Bookable'}</td>
                           <td><Reveal label="Edit">
                             <form action={A.updateSpaceAction} className="grid sm:grid-cols-2 gap-2 min-w-[18rem]">
                               <Hidden name="id" value={x.id} />
@@ -157,22 +163,30 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
         </Card>
 
         <Card title="Food & event packages">
-          <div id="packages" className="space-y-2">
+          <div id="packages" className="space-y-3">
+            <p className="text-xs muted">Packages appear on bookings only when they have a price and their property has “Food packages” ticked (Properties above).</p>
             {packages.map((p) => (
-              <form key={p.id} action={A.savePackageAction} className="grid sm:grid-cols-6 gap-2 items-end">
+              <form key={p.id} action={A.savePackageAction} className="grid sm:grid-cols-6 gap-2 items-end border-b border-slate-100 pb-3">
                 <Hidden name="id" value={p.id} />
-                <Field label="Name"><input name="name" defaultValue={p.name} className="input" /></Field>
-                <Field label="What’s included" className="sm:col-span-2"><input name="description" defaultValue={p.description ?? ''} className="input" /></Field>
-                <Field label="Price (₹)"><input type="number" name="price" min={0} defaultValue={Number(p.price)} className="input" /></Field>
+                <Field label="Package name"><input name="name" defaultValue={p.name} className="input" /></Field>
+                <Field label="Property"><select name="property_id" defaultValue={p.property_id ?? ''} className="input"><option value="">All properties</option>{properties.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}</option>)}</select></Field>
+                <Field label="Menu / what’s included" className="sm:col-span-2"><input name="description" defaultValue={p.description ?? ''} placeholder="NOT CONFIGURED" className="input" /></Field>
+                <Field label="Price (₹)"><input type="number" name="price" min={0} defaultValue={p.price === null ? '' : Number(p.price)} placeholder="NOT CONFIGURED" className="input" /></Field>
                 <Field label="Price is"><select name="price_basis" defaultValue={p.price_basis} className="input"><option value="per_person">per guest</option><option value="flat">flat</option></select></Field>
+                <Field label="Minimum guests"><input type="number" name="min_guests" min={0} defaultValue={p.min_guests ?? ''} placeholder="NOT CONFIGURED" className="input" /></Field>
+                <Field label="Optional add-ons" className="sm:col-span-2"><input name="add_ons" defaultValue={p.add_ons ?? ''} placeholder="e.g. DJ ₹5,000, decoration ₹3,000" className="input" /></Field>
+                <Field label="Availability"><select name="active" defaultValue={p.active ? 'on' : 'off'} className="input"><option value="on">Available</option><option value="off">Not available</option></select></Field>
                 <SubmitButton className="btn-secondary">Save</SubmitButton>
               </form>
             ))}
             <form action={A.savePackageAction} className="grid sm:grid-cols-6 gap-2 items-end">
               <Field label="New package"><input name="name" required className="input" /></Field>
-              <Field label="What’s included" className="sm:col-span-2"><input name="description" className="input" /></Field>
-              <Field label="Price (₹)"><input type="number" name="price" min={0} className="input" /></Field>
+              <Field label="Property"><select name="property_id" className="input"><option value="">All properties</option>{properties.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}</option>)}</select></Field>
+              <Field label="Menu / what’s included" className="sm:col-span-2"><input name="description" className="input" /></Field>
+              <Field label="Price (₹)"><input type="number" name="price" min={0} placeholder="NOT CONFIGURED" className="input" /></Field>
               <Field label="Price is"><select name="price_basis" className="input"><option value="per_person">per guest</option><option value="flat">flat</option></select></Field>
+              <Field label="Minimum guests"><input type="number" name="min_guests" min={0} className="input" /></Field>
+              <Field label="Optional add-ons" className="sm:col-span-2"><input name="add_ons" className="input" /></Field>
               <SubmitButton>Add</SubmitButton>
             </form>
           </div>

@@ -4,11 +4,11 @@ import { createCustomer, findCustomerByPhone } from './customers'
 
 export type Space = {
   id: string; property_id: string; property_name: string; name: string; kind: 'room' | 'hall' | 'rooftop' | 'other'
-  room_type: string | null; capacity: number | null; facilities: string | null; price: string; price_unit: string; active: boolean
+  room_type: string | null; capacity: number | null; facilities: string | null; price: string | null; price_unit: string; active: boolean
 }
 
 export type AvailabilitySpace = Space & {
-  status: 'free' | 'booked' | 'tentative'
+  status: 'free' | 'booked' | 'tentative' | 'not_configured'
   conflicts: { booking_id: string; ref: string; status: string; customer: string; start_at: string; end_at: string }[]
 }
 
@@ -38,7 +38,7 @@ export async function availability(start: Date, end: Date, kinds?: string[], exc
     .filter((s) => !kinds || kinds.includes(s.kind))
     .map((s) => {
       const mine = rows.filter((r) => r.space_id === s.id)
-      const status = mine.some((r) => r.holds) ? 'booked' : mine.length ? 'tentative' : 'free'
+      const status = s.price === null ? 'not_configured' : mine.some((r) => r.holds) ? 'booked' : mine.length ? 'tentative' : 'free'
       return { ...s, status, conflicts: mine.map(({ booking_id, ref, status, customer, start_at, end_at }) => ({ booking_id, ref, status, customer, start_at, end_at })) }
     })
 }
@@ -97,6 +97,7 @@ async function addSpaceLines(db: Db, bookingId: string, spaceIds: string[], star
   const spaces = await q<Space>(`SELECT s.*, p.name AS property_name FROM crm.spaces s JOIN crm.properties p ON p.id = s.property_id WHERE s.id = ANY($1::uuid[])`, [spaceIds], db)
   let i = 0
   for (const s of spaces) {
+    if (s.price === null || !s.active) throw new Error(`${s.name} (${s.property_name}) is not configured for booking yet (inactive or no price set). Complete it in Settings → Rooms & spaces first.`)
     const qty = qtyFor(s, ctx)
     const desc = `${s.property_name} · ${s.name}` + (qty > 1 || s.price_unit !== 'slot' ? ` (${qty} ${unitLabel[s.price_unit] ?? s.price_unit}${qty === 1 ? '' : 's'})` : '')
     await q(
@@ -132,7 +133,8 @@ export async function createBooking(input: NewBookingInput, userId?: string | nu
       if (input.event) await addSpaceLines(db, id, input.event.spaceIds, input.event.start, input.event.end, { nights: 1, hours: input.event.hours, guests })
       if (input.rooms) await addSpaceLines(db, id, input.rooms.spaceIds, input.rooms.start, input.rooms.end, { nights: input.rooms.nights, hours: 0, guests })
       if (input.packageId) {
-        const p = await q1<{ name: string; price: string; price_basis: string }>(`SELECT name, price, price_basis FROM crm.packages WHERE id = $1`, [input.packageId], db)
+        const p = await q1<{ name: string; price: string | null; price_basis: string }>(`SELECT name, price, price_basis FROM crm.packages WHERE id = $1`, [input.packageId], db)
+        if (p && p.price === null) throw new Error(`The “${p.name}” package has no price yet. Set it in Settings → Packages first.`)
         if (p) {
           const qty = p.price_basis === 'per_person' ? Math.max(1, guests) : 1
           await q(`INSERT INTO crm.booking_items (booking_id, line_type, description, qty, unit_price, sort_order) VALUES ($1,'package',$2,$3,$4,50)`,
