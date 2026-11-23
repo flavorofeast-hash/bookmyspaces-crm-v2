@@ -18,7 +18,9 @@ describe('environment isolation', () => {
   it('Production uses CRM_DATABASE_URL, else POSTGRES_URL; never the test one', () => {
     set({ CRM_DATABASE_URL: undefined, CRM_ENV: undefined, VERCEL_ENV: 'production', POSTGRES_URL: 'postgres://prod:x@prod-host:6543/postgres?pgbouncer=true', CRMTEST_POSTGRES_URL: 'postgres://t@t/t' })
     expect(databaseUrl()).toBe('postgres://prod:x@prod-host:6543/postgres')
-    set({ CRM_DATABASE_URL: 'postgres://a@b/c' }); expect(databaseUrl()).toBe('postgres://a@b/c')
+    set({ CRMPROD_POSTGRES_URL: 'postgres://v2prod:x@v2-host:6543/postgres?sslmode=require' }); expect(databaseUrl()).toBe('postgres://v2prod:x@v2-host:6543/postgres')
+    set({ VERCEL_ENV: 'preview' }); expect(databaseUrl()).toBe('postgres://t@t/t') // Preview never reads CRMPROD_*
+    set({ VERCEL_ENV: 'production', CRM_DATABASE_URL: 'postgres://a@b/c' }); expect(databaseUrl()).toBe('postgres://a@b/c')
   })
   it('Preview ignores live WhatsApp/Meta values even if set for all environments', () => {
     set({ VERCEL_ENV: 'preview', WHATSAPP_ACCESS_TOKEN: 'LIVE', PREVIEW_WHATSAPP_ACCESS_TOKEN: undefined })

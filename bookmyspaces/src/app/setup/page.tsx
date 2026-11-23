@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { timingSafeEqual } from 'crypto'
 import { setupState, pool } from '@/lib/db'
 import { applyMigrations } from '@/lib/migrate'
@@ -17,9 +18,27 @@ function codeOk(given: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b)
 }
 
+/**
+ * True when this request arrived on this deployment's own generated address (VERCEL_URL,
+ * e.g. bookmyspaces-crm-next-abc123-team.vercel.app). Vercel Deployment Protection lets only
+ * signed-in members of the Vercel team open that address, so first-time setup there needs no
+ * setup code. The public production address always needs CRM_SETUP_CODE.
+ */
+async function onPrivateAddress(): Promise<boolean> {
+  const own = (process.env.VERCEL_URL ?? '').toLowerCase()
+  if (!own || process.env.VERCEL_ENV !== 'production') return false
+  const h = await headers()
+  const host = (h.get('host') ?? '').toLowerCase(), fwd = (h.get('x-forwarded-host') ?? host).toLowerCase()
+  return host === own && fwd === own
+}
+
+async function authorised(f: FormData) {
+  return (await onPrivateAddress()) || codeOk(String(f.get('code') ?? ''))
+}
+
 async function initDb(f: FormData) {
   'use server'
-  if (!codeOk(String(f.get('code') ?? ''))) redirect('/setup?err=' + encodeURIComponent('Setup code is incorrect.'))
+  if (!(await authorised(f))) redirect('/setup?err=' + encodeURIComponent('Setup code is incorrect.'))
   if ((await setupState()) !== 'missing-schema') redirect('/setup')
   let msg = ''
   try { await applyMigrations(pool()) } catch (e) { msg = (e as Error).message }
@@ -42,7 +61,7 @@ async function quickSetup() {
 
 async function createOwner(f: FormData) {
   'use server'
-  if (!codeOk(String(f.get('code') ?? ''))) redirect('/setup?err=' + encodeURIComponent('Setup code is incorrect.'))
+  if (!(await authorised(f))) redirect('/setup?err=' + encodeURIComponent('Setup code is incorrect.'))
   if ((await setupState()) !== 'no-users') redirect('/login')
   let err = ''
   try {
@@ -58,7 +77,8 @@ export default async function SetupPage(props: { searchParams: Promise<{ err?: s
   let dbError = ''
   try { state = await setupState() } catch (e) { state = 'missing-config'; dbError = (e as Error).message }
   if (state === 'ready') redirect('/login')
-  const codeSet = (process.env.CRM_SETUP_CODE ?? '').length >= 8
+  const priv = await onPrivateAddress()
+  const codeSet = (process.env.CRM_SETUP_CODE ?? '').length >= 8 || priv
   const testCopy = allowsDefaultAdmin()
   return (
     <main className="min-h-screen flex items-center justify-center p-4">
@@ -78,12 +98,12 @@ export default async function SetupPage(props: { searchParams: Promise<{ err?: s
           </form>
         )}
         {state !== 'missing-config' && !testCopy && !codeSet && (
-          <p className="text-sm text-red-700">Setup is locked: CRM_SETUP_CODE (8+ characters) must be set in the environment first.</p>
+          <p className="text-sm text-red-700">Setup is locked on the public address. Open it from the private Vercel link instead: Vercel → bookmyspaces-crm-next → Deployments → latest Production deployment → Visit, then add <code>/setup</code> to the address.</p>
         )}
         {state === 'missing-schema' && !testCopy && codeSet && (
           <form action={initDb} className="space-y-3">
             <p className="text-sm">Step 1 of 2: create the CRM tables. This only adds a new <code>crm</code> area to the database; existing tables are not touched.</p>
-            <label className="block"><span className="label">Setup code</span><input name="code" type="password" required className="input" /></label>
+            {!priv && <label className="block"><span className="label">Setup code</span><input name="code" type="password" required className="input" /></label>}
             <SubmitButton pendingText="Creating tables…">Create database tables</SubmitButton>
           </form>
         )}
@@ -93,7 +113,7 @@ export default async function SetupPage(props: { searchParams: Promise<{ err?: s
             <input type="hidden" name="name" value="Team" />
             <label className="block"><span className="label">Username</span><input name="username" defaultValue="admin" required className="input" autoComplete="username" /></label>
             <label className="block"><span className="label">Strong password (10+ characters, not easy to guess)</span><input name="password" type="password" minLength={10} required className="input" autoComplete="new-password" /></label>
-            <label className="block"><span className="label">Setup code</span><input name="code" type="password" required className="input" /></label>
+            {!priv && <label className="block"><span className="label">Setup code</span><input name="code" type="password" required className="input" /></label>}
             <SubmitButton pendingText="Creating…">Create login</SubmitButton>
           </form>
         )}

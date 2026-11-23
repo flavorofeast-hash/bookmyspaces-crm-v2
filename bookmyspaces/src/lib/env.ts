@@ -49,13 +49,13 @@ function cleanUrl(url: string): string {
 /**
  * Database address. CRM_DATABASE_URL always wins. Otherwise:
  *  - Preview: only the test database created through Vercel's Supabase integration (prefix CRMTEST).
- *  - Production: POSTGRES_URL from the production Supabase project's Vercel integration.
+ *  - Production: CRMPROD_POSTGRES_URL (V2's own production database via Vercel's Supabase integration), else POSTGRES_URL.
  * A Preview never reads POSTGRES_URL, so it can never reach the production database by accident.
  */
 export function databaseUrl(): string | undefined {
   const raw = process.env.CRM_DATABASE_URL
     || (onVercelPreview() ? process.env.CRMTEST_POSTGRES_URL : undefined)
-    || (crmEnv() === 'production' && !onVercelPreview() ? process.env.POSTGRES_URL : undefined)
+    || (crmEnv() === 'production' && !onVercelPreview() ? process.env.CRMPROD_POSTGRES_URL || process.env.POSTGRES_URL : undefined)
   return raw ? cleanUrl(raw) : undefined
 }
 
