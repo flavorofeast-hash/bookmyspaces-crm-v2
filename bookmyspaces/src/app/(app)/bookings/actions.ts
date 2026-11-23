@@ -81,7 +81,7 @@ export async function removeItemAction(f: FormData) {
 export async function updateDetailsAction(f: FormData) {
   const u = await requireUser()
   await run(`/bookings/${bk(f)}`, 'Booking details saved.', async () => {
-    await updateBookingDetails(bk(f), { eventType: str(f, 'event_type'), guests: num(f, 'guests'), foodRequirements: str(f, 'food_requirements'), notes: str(f, 'notes'), discount: f.has('discount') ? num(f, 'discount') ?? 0 : undefined }, u.id)
+    await updateBookingDetails(bk(f), { eventType: str(f, 'event_type'), guests: num(f, 'guests'), foodRequirements: str(f, 'food_requirements'), notes: str(f, 'notes'), discount: f.has('discount') ? num(f, 'discount') ?? 0 : undefined, assignedTo: f.has('assigned_to') ? str(f, 'assigned_to') || null : undefined }, u.id)
   })
 }
 

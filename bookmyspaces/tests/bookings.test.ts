@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { resetDb, closePool, seedSpaces, newCustomer, ist } from './helpers'
 import { q, q1 } from '@/lib/db'
-import { createBooking, setBookingStatus, availability, addBookingItem, BookingConflictError, getBooking } from '@/lib/bookings'
+import { createBooking, setBookingStatus, availability, addBookingItem, BookingConflictError, getBooking, updateBookingDetails } from '@/lib/bookings'
 
 let S: Awaited<ReturnType<typeof seedSpaces>>
 let c1: string, c2: string
@@ -152,5 +152,21 @@ describe('inventory: not-configured spaces', () => {
     const b = await createBooking({ customerId: c1, bookingType: 'event', event: e, start: e.start, end: e.end })
     await q(`UPDATE crm.spaces SET active = false WHERE id = $1`, [nc])
     await expect(setBookingStatus(b.id, 'confirmed')).rejects.toThrow(/not configured/)
+  })
+})
+
+describe('enquiry assignment', () => {
+  it('new booking is assigned to its creator; staff can reassign or unassign; other details keep it', async () => {
+    const u = (await q1<{ id: string }>(`INSERT INTO crm.app_users (email, name, role, password_hash) VALUES ('assign-t','Asha','staff','x') RETURNING id`))!.id
+    const e = event([S.hall], '2027-04-01', '10:00', '14:00')
+    const b = await createBooking({ customerId: c1, bookingType: 'event', event: e, start: e.start, end: e.end }, u)
+    const a = async () => (await q1<{ a: string | null }>(`SELECT assigned_to AS a FROM crm.bookings WHERE id = $1`, [b.id]))!.a
+    expect(await a()).toBe(u)
+    await updateBookingDetails(b.id, { notes: 'x' })
+    expect(await a()).toBe(u)
+    await updateBookingDetails(b.id, { notes: 'x', assignedTo: null })
+    expect(await a()).toBeNull()
+    await updateBookingDetails(b.id, { notes: 'x', assignedTo: u })
+    expect(await a()).toBe(u)
   })
 })

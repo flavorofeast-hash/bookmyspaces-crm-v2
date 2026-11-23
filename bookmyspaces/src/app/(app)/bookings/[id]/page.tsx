@@ -17,9 +17,10 @@ export default async function BookingPage(props: { params: Promise<{ id: string 
   const user = await requireUser()
   const b = await getBooking(params.id).catch(() => null)
   if (!b) notFound()
-  const [spaces, followUps] = await Promise.all([
+  const [spaces, followUps, staff] = await Promise.all([
     listSpaces(),
     q<any>(`SELECT * FROM crm.follow_ups WHERE booking_id = $1 AND done_at IS NULL ORDER BY due_on`, [b.id]),
+    q<{ id: string; name: string }>(`SELECT id, name FROM crm.app_users WHERE active OR id = $1 ORDER BY name`, [b.assigned_to]),
   ])
   const editable = !['completed', 'cancelled'].includes(b.status)
   const isOwner = user.role === 'owner'
@@ -226,6 +227,7 @@ export default async function BookingPage(props: { params: Promise<{ id: string 
           <Card title="Details">
             <form action={updateDetailsAction} className="space-y-2">
               <Hidden name="booking_id" value={b.id} />
+              <Field label="Assigned to"><select name="assigned_to" defaultValue={b.assigned_to ?? ''} className="input"><option value="">Not assigned</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
               <Field label="Occasion"><select name="event_type" defaultValue={b.event_type ?? ''} className="input"><option value="">—</option>{Array.from(new Set([...EVENT_TYPES, ...(b.event_type ? [b.event_type] : [])])).map((e) => <option key={e}>{e}</option>)}</select></Field>
               <Field label="Guests"><input type="number" name="guests" min={0} defaultValue={b.guests ?? ''} className="input" /></Field>
               <Field label="Discount (₹)"><input type="number" name="discount" min={0} defaultValue={Number(b.discount)} disabled={!editable} className="input" /></Field>

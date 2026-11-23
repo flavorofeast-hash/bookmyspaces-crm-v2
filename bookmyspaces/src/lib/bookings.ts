@@ -124,8 +124,8 @@ export async function createBooking(input: NewBookingInput, userId?: string | nu
       const prop = firstSpace ? await q1<{ property_id: string }>(`SELECT property_id FROM crm.spaces WHERE id = $1`, [firstSpace], db) : null
       const b = await q1<{ id: string }>(
         `INSERT INTO crm.bookings (ref, customer_id, property_id, booking_type, event_type, guests, start_at, end_at, status, package_id,
-           food_requirements, notes, discount, source, campaign_id, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'enquiry',$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
+           food_requirements, notes, discount, source, campaign_id, created_by, assigned_to)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'enquiry',$9,$10,$11,$12,$13,$14,$15,$15) RETURNING id`,
         [ref, customerId, prop?.property_id ?? null, input.bookingType, input.eventType || null, guests || null, input.start, input.end,
           input.packageId || null, input.foodRequirements || null, input.notes || null, Math.max(0, input.discount ?? 0),
           input.source ?? cust.source, input.campaignId ?? cust.campaign_id, userId ?? null], db)
@@ -229,13 +229,14 @@ export async function removeBookingItem(itemId: string, userId?: string | null) 
   })
 }
 
-export async function updateBookingDetails(id: string, d: { eventType?: string | null; guests?: number | null; foodRequirements?: string | null; notes?: string | null; discount?: number }, userId?: string | null) {
+export async function updateBookingDetails(id: string, d: { eventType?: string | null; guests?: number | null; foodRequirements?: string | null; notes?: string | null; discount?: number; assignedTo?: string | null }, userId?: string | null) {
   await tx(async (db) => {
     const b = await q1<{ status: string; customer_id: string }>(`SELECT status, customer_id FROM crm.bookings WHERE id = $1 FOR UPDATE`, [id], db)
     if (!b) throw new Error('Booking not found.')
     if (['completed', 'cancelled'].includes(b.status) && d.discount !== undefined) throw new Error('Completed or cancelled bookings cannot be repriced.')
-    await q(`UPDATE crm.bookings SET event_type = $2, guests = $3, food_requirements = $4, notes = $5, discount = COALESCE($6, discount), updated_at = now() WHERE id = $1`,
-      [id, d.eventType || null, d.guests ?? null, d.foodRequirements || null, d.notes || null, d.discount ?? null], db)
+    await q(`UPDATE crm.bookings SET event_type = $2, guests = $3, food_requirements = $4, notes = $5, discount = COALESCE($6, discount),
+       assigned_to = CASE WHEN $7 THEN $8::uuid ELSE assigned_to END, updated_at = now() WHERE id = $1`,
+      [id, d.eventType || null, d.guests ?? null, d.foodRequirements || null, d.notes || null, d.discount ?? null, d.assignedTo !== undefined, d.assignedTo || null], db)
     await recalcBooking(id, db)
     await logActivity({ userId, customerId: b.customer_id, bookingId: id, action: 'booking_updated' }, db)
   })
@@ -244,9 +245,9 @@ export async function updateBookingDetails(id: string, d: { eventType?: string |
 export async function getBooking(id: string) {
   const b = await q1<any>(
     `SELECT b.*, c.name AS customer_name, c.phone AS customer_phone, c.whatsapp AS customer_whatsapp, c.email AS customer_email,
-       p.name AS property_name, pk.name AS package_name, bb.received, bb.refunded, bb.net_paid, bb.balance
+       p.name AS property_name, pk.name AS package_name, au.name AS assigned_name, bb.received, bb.refunded, bb.net_paid, bb.balance
      FROM crm.bookings b JOIN crm.customers c ON c.id = b.customer_id
-     LEFT JOIN crm.properties p ON p.id = b.property_id LEFT JOIN crm.packages pk ON pk.id = b.package_id
+     LEFT JOIN crm.properties p ON p.id = b.property_id LEFT JOIN crm.packages pk ON pk.id = b.package_id LEFT JOIN crm.app_users au ON au.id = b.assigned_to
      JOIN crm.booking_balances bb ON bb.booking_id = b.id WHERE b.id = $1`, [id])
   if (!b) return null
   const [items, payments, documents] = await Promise.all([
@@ -261,6 +262,7 @@ export async function getBooking(id: string) {
 export async function listBookings(f: { status?: string; from?: string; to?: string; term?: string; limit?: number } = {}) {
   return q<any>(
     `SELECT b.*, c.name AS customer_name, c.phone AS customer_phone, bb.balance, bb.net_paid,
+       (SELECT name FROM crm.app_users WHERE id = b.assigned_to) AS assigned_name,
        (SELECT string_agg(s.name, ', ' ORDER BY s.name) FROM crm.booking_items i JOIN crm.spaces s ON s.id = i.space_id WHERE i.booking_id = b.id) AS spaces
      FROM crm.bookings b JOIN crm.customers c ON c.id = b.customer_id JOIN crm.booking_balances bb ON bb.booking_id = b.id
      WHERE ($1::text IS NULL OR b.status = $1)

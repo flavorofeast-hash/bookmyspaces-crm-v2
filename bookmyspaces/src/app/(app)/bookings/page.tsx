@@ -86,7 +86,7 @@ export default async function BookingsPage(props: { searchParams: Promise<SP> })
                 <tbody>{rows.map((b) => (
                   <tr key={b.id}>
                     <td><Link href={`/bookings/${b.id}`} className="link font-medium">{b.ref}</Link><div className="text-xs muted">{BOOKING_TYPE_LABEL[b.booking_type]}{b.event_type ? ` · ${b.event_type}` : ''}</div></td>
-                    <td>{b.customer_name}</td>
+                    <td>{b.customer_name}{b.assigned_name && <div className="text-xs muted">→ {b.assigned_name}</div>}</td>
                     <td className="text-xs whitespace-nowrap">{fmtDateTime(b.start_at)}<br />{fmtDateTime(b.end_at)}</td>
                     <td className="hidden md:table-cell text-xs">{b.spaces ?? '—'}</td>
                     <td><Badge value={b.status} label={STATUS_LABEL[b.status]} /></td>
