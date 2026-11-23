@@ -49,7 +49,7 @@ export default async function CustomerPage(props: { params: Promise<{ id: string
       )}
       {c.import_flags?.length > 0 && <p className="text-xs muted mb-3">Imported from the old CRM{c.import_flags.includes('no_phone') ? ' — no mobile number in the old record' : ''}{c.import_flags.includes('merged_duplicate_leads') ? ' — several old leads with this number were merged here' : ''}.</p>}
 
-      <div className="grid lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2 space-y-4">
           <Card title="Bookings & enquiries" actions={totalDue > 0 ? <span className="text-sm text-amber-700 font-medium">Balance due {inr(totalDue)}</span> : null} pad={false}>
             {bookings.length === 0 ? <div className="card-pad"><Empty>No bookings yet.</Empty></div> : (

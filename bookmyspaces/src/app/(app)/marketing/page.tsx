@@ -18,7 +18,7 @@ export default async function MarketingPage(props: { searchParams: Promise<{ ok?
     <>
       <PageHeader title="Marketing" subtitle="Plan posts, publish to Facebook & Instagram, track which campaigns bring enquiries" actions={<Link href="/marketing/posts/new" className="btn-primary">+ New post</Link>} />
       <Flash ok={searchParams.ok} err={searchParams.err} />
-      <div className="grid lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <Card title="Content calendar" pad={false}>
             {posts.length === 0 ? <div className="card-pad"><Empty>No posts yet. <Link href="/marketing/posts/new" className="link">Create the first one</Link>.</Empty></div> : (

@@ -26,7 +26,7 @@ export default async function TodayPage(props: { searchParams: Promise<{ ok?: st
         <Stat label="Received this month" value={inr(d.money.received_this_month)} sub={`Advances ${inr(d.money.advances_this_month)} · today ${inr(d.money.received_today)}`} tone="good" />
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card title={`Follow-ups due (${d.followUps.length})`}>
           {d.followUps.length === 0 ? <Empty>Nothing due. </Empty> : (
             <ul className="divide-y divide-slate-100">{d.followUps.map((f) => (

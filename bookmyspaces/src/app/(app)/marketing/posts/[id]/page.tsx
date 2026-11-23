@@ -29,7 +29,7 @@ export default async function PostPage(props: { params: Promise<{ id: string }>;
     <>
       <PageHeader title={isNew ? 'New post' : post.title} subtitle={<Link href="/marketing" className="link">← Marketing</Link>} />
       <Flash ok={searchParams.ok} err={searchParams.err} />
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card title="Content">
           <form action={savePostAction} className="space-y-3">
             <Hidden name="id" value={post?.id} />

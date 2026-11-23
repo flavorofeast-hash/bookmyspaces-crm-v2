@@ -1,3 +1,24 @@
+# Handover regression on production — 24 Nov 2026 (commit 64006bd + mobile fix)
+
+All records are ZZ TEST (property "ZZ TEST (go-live check, not real)", customers ZZ TEST B/C). Document numbers used by tests: QT-2026-0001/0002, RCP-2026-0001…0005, BILL-2026-0001/0002, RFN-2026-0001/0002.
+
+| Test | Result |
+|---|---|
+| Customer create; duplicate mobile in another format → existing record; edit email saved; search by mobile and by name | PASS |
+| Follow-up created with the customer | PASS |
+| MonuRama spaces shown "Not configured" and disabled; forced submit of Hall 01 refused by server | PASS |
+| Enquiry on TEST Hall → assigned to creator → quotation QT-2026-0002 | PASS |
+| Advance ₹2,000 + confirm → RCP-2026-0003, balance ₹3,000 | PASS |
+| Second customer, same hall/slot: shown booked + disabled; forced confirm → "Double booking prevented" | PASS |
+| Modification: extra item ₹500 → total ₹5,500; issued quotation unchanged | PASS |
+| Final bill BILL-2026-0002; balance ₹3,500 → RCP-2026-0004, balance ₹0; Mark completed | PASS |
+| Assignment: unassign and reassign saved | PASS |
+| Room stay confirm + advance ₹500 (RCP-2026-0005); cancel without reason refused; cancel with reason; refund ₹900 refused (max ₹500); refund ₹500 → RFN-2026-0002; room free again | PASS |
+| Customer page shows booking, quotation, bill, receipts | PASS |
+| Today, Bookings, Billing, Inbox, Marketing, Settings, Customers load | PASS |
+| Mobile 375px: new booking, settings OK; booking page was 41px too wide → fixed (grid-cols-1), re-checked after deploy | PASS |
+| Logout/login, staff permission boundaries | NOT RUN on production (would need a password typed by Claude). Covered by automated tests and the 22 Nov Preview run; owner check listed in handover |
+
 # Production go-live — 23 Nov 2026 (https://bookmyspaces-crm-next.vercel.app, V2's own database)
 
 Import: V3 read-only export (signed in to V3 as flavor.of.east@gmail.com; nothing changed in V3). 85 leads exported; 10 demo/test + 9 internal-test leads excluded; **66 imported** (19 without phone, flagged). Re-run: 0 new, 66 already imported. Full export (85 leads, 27 proposals, 21 invoices, 10 payments, 7 packages, 237 activity logs) saved to Desktop `bookmyspaces_v3_export_2026-11-23.json`.

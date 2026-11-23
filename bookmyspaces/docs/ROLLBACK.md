@@ -1,3 +1,13 @@
+# Current rollback points (24 Nov 2026) — V2 on its own database
+
+**Code:** Vercel → project `bookmyspaces-crm-next` → Deployments. Last known-good before the handover changes: `dpl_BxtZS1DhbuBw6NQsZ3nyH59a55DC` (commit `edaab87`). Open it → **⋯ → Promote to Production / Instant Rollback**. Git copy: branch `rollback-2026-11-24` on raju1605jobs-hash/bookmyspaces-crm-v2.
+
+**Database:** production Supabase project `psewvydpcmyerxfrweky` has a full snapshot of every `crm` table in schema `crm_backup_20261124` (taken before the handover changes; row counts verified: 68 customers, 2 bookings, 3 payments, 5 documents, 18 spaces). To inspect: SQL editor → `select * from crm_backup_20261124.customers`. Restore a table only after checking with the owner, e.g. `insert into crm.customers select * from crm_backup_20261124.customers b where not exists (select 1 from crm.customers c where c.id=b.id);`. The 24 Nov schema change (migration 005) only added a nullable `bookings.assigned_to` column; rolling back the code does not need a database change.
+
+**V3** (bookmyspaces-crm-v2.vercel.app, its own database) is untouched and remains the fallback. Original V3 export: `bookmyspaces_v3_export_2026-11-23.json` in the Desktop folder BookMySpaces_CRM_v2_Final.
+
+---
+
 # BookMySpaces CRM v2 — Rollback procedures
 
 Application rollback and database rollback are **independent**. Most problems need only the application rollback. The database rollback is rarely needed, because going live never changes or deletes the old tables.

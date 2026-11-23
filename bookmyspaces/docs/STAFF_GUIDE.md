@@ -1,21 +1,32 @@
 # BookMySpaces CRM — staff guide
 
-**Address:** https://bookmyspaces-crm-next.vercel.app (works in any browser, phone or computer)
-**Login:** username `admin` + the team password the owner gives you. Everyone uses the same login. Never share it outside the team.
+**Address:** https://bookmyspaces-crm-next.vercel.app (any browser, phone or computer)
+**Login:** username `admin` + the team password the owner gives you. Never share it outside the team.
 
-## Daily use
-- **Today** — what needs attention: new enquiries, follow-ups due, today's check-ins/events, unpaid balances. Start here every morning.
-- **Customers** — search by name or mobile. `+ Add customer` for a new enquiry. The same mobile number is never added twice — the CRM opens the existing customer instead. Each customer page shows the full history (enquiries, bookings, quotations, payments).
-- **Bookings** — `+ New booking`: choose rooms / hall / rooftop and dates. Booked spaces are greyed out. Save as **enquiry** (nothing blocked yet) → **Confirm booking** when the customer agrees (spaces become blocked; two people can never confirm the same space at the same time). Add food/extra items on the booking page.
-- **Billing** (on each booking) — Issue quotation → record **advance** (receipt is created automatically) → issue **final bill** → record **balance**. "Balance due" always shows what is left. To cancel: **Cancel booking** (reason required), then **Record a refund** (cannot exceed what was paid; a refund note is created). The Billing page lists all outstanding balances. No GST is charged.
-- **Inbox** — WhatsApp chats (switched on later; until then WhatsApp stays on the old CRM).
-- **Marketing** — campaigns with a WhatsApp link (to see which campaign brings enquiries) and a content calendar for posts.
-- **Settings** (owner) — business details, properties, rooms/halls/rooftop with prices, event time slots, food packages, team password.
+## Daily procedure (5 steps)
+1. **Morning — open Today.** Work through new enquiries, follow-ups due, today's check-ins/events and unpaid balances.
+2. **New enquiry (phone, walk-in, WhatsApp, Facebook, Instagram):** Customers → search the mobile number. Not found → `+ Add customer` (the same number is never added twice). Add a follow-up date if they need a call back.
+3. **Check availability and save:** on the customer page → `+ New booking / enquiry` → choose type and dates → **Check availability**. Booked spaces are greyed out; spaces marked **Not configured** cannot be booked until the owner fills in their price in Settings. Tick spaces → **Save as enquiry** (nothing blocked) or **Save and issue quotation**. On the booking page, set **Assigned to** (Details card) for the person handling it.
+4. **Customer agrees:** booking page → **Record payment** → kind *Advance*, tick *Also confirm the booking* → receipt is created; send it with the WhatsApp link. Two people can never confirm the same space at the same time.
+5. **Event day / check-out:** add any extra items → **Issue final bill** → record *Balance payment* → **Mark completed** when balance is ₹0.
 
-## Print / send documents
-Every quotation, receipt, bill and refund note has **View / print** and a customer link you can send on WhatsApp.
+**Change of plan:** add/remove items on the booking page (old quotations stay as they were; issue a revised quotation). **Cancellation:** Cancel booking (reason required) → **Record refund** (cannot exceed what was paid; refund note created). No GST is charged.
+
+## Menu
+- **Today** — what needs attention now.
+- **Customers** — search by name or mobile; each customer page shows all enquiries, bookings, documents, payments and follow-ups.
+- **Bookings** — calendar and list (filter by status; "→ name" shows who it is assigned to).
+- **Billing** — all outstanding balances and documents.
+- **Inbox** — WhatsApp chats (not connected yet; record WhatsApp enquiries manually as above).
+- **Marketing** — campaigns with tracking links and a post calendar (posting to Facebook/Instagram is manual until connected).
+- **Settings** (owner only) — business details, properties, rooms & spaces, prices, time slots, food packages, staff logins.
+
+## Owner: completing inventory (Settings)
+- **Rooms & spaces** → **Edit** on a row: name, category, capacity, max occupancy, price and unit, facilities, description, booking rules, active. A space is bookable only when it is **active and has a price**; the table shows *Not bookable (no price)* until then.
+- **Properties** → booking rules, **Food packages** switch.
+- **Packages** → name, property, menu, price per person, minimum guests, add-ons, available. Only available, priced packages are offered on bookings.
 
 ## If something goes wrong
-- Forgot password → ask the owner (Settings → Login → Change password; this signs out every device).
-- Phone lost → owner clicks **Sign out all devices** and changes the password.
-- Anything else → tell the owner; nothing you do can delete payment records (they can only be voided with a reason).
+- Forgot password → owner: Settings → Login → Change password (signs out every device).
+- Phone lost → owner: **Sign out all devices**, then change the password.
+- Payments and documents are never deleted; they can only be voided with a reason.
