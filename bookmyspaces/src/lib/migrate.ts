@@ -10,12 +10,15 @@ export function migrationsDir(): string {
   return path.join(process.cwd(), 'db', 'migrations')
 }
 
+export function migrationFiles(dir = migrationsDir()): string[] {
+  return readdirSync(dir).filter((f) => /^\d+_.*\.sql$/.test(f)).sort()
+}
+
 export async function applyMigrations(pool: Pool, dir = migrationsDir()): Promise<string[]> {
   const files = readdirSync(dir).filter((f) => /^\d+_.*\.sql$/.test(f)).sort()
   const client = await pool.connect()
   const applied: string[] = []
   try {
-    await client.query(`SELECT pg_advisory_lock(727274001)`) // one migrator at a time (serverless instances may start together)
     await client.query(`CREATE SCHEMA IF NOT EXISTS crm`)
     await client.query(`CREATE TABLE IF NOT EXISTS crm.schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())`)
     const done = new Set((await client.query(`SELECT version FROM crm.schema_migrations`)).rows.map((r) => r.version))
@@ -30,11 +33,12 @@ export async function applyMigrations(pool: Pool, dir = migrationsDir()): Promis
         applied.push(f)
       } catch (e) {
         await client.query('ROLLBACK')
+        // Another server instance applied the same migration at the same moment: that is fine.
+        if ((await client.query(`SELECT 1 FROM crm.schema_migrations WHERE version = $1`, [f])).rowCount) continue
         throw new Error(`Migration ${f} failed and was rolled back: ${(e as Error).message}`)
       }
     }
   } finally {
-    await client.query(`SELECT pg_advisory_unlock(727274001)`).catch(() => {})
     client.release()
   }
   return applied

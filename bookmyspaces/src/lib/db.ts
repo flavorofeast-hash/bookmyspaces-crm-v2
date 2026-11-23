@@ -65,8 +65,9 @@ let upgraded = false
 /** Once the CRM exists, newer additive migrations (004+) are applied automatically, once per server instance. */
 async function ensureUpgrades() {
   if (upgraded) return
-  const { applyMigrations } = await import('./migrate')
-  await applyMigrations(pool())
+  const { applyMigrations, migrationFiles } = await import('./migrate')
+  const done = new Set((await q<{ version: string }>(`SELECT version FROM crm.schema_migrations`)).map((r) => r.version))
+  if (migrationFiles().some((f) => !done.has(f))) await applyMigrations(pool())
   upgraded = true
 }
 
