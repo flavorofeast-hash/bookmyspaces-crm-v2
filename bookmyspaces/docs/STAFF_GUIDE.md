@@ -1,7 +1,7 @@
 # BookMySpaces CRM — staff guide
 
 **Address:** https://bookmyspaces-crm-next.vercel.app (any browser, phone or computer)
-**Login:** username `admin` + the team password the owner gives you. Never share it outside the team.
+**Login:** your own username and password from the owner. Never share it.
 
 ## Daily procedure (5 steps)
 1. **Morning — open Today.** Work through new enquiries, follow-ups due, today's check-ins/events and unpaid balances.
@@ -25,6 +25,12 @@
 - **Rooms & spaces** → **Edit** on a row: name, category, capacity, max occupancy, price and unit, facilities, description, booking rules, active. A space is bookable only when it is **active and has a price**; the table shows *Not bookable (no price)* until then.
 - **Properties** → booking rules, **Food packages** switch.
 - **Packages** → name, property, menu, price per person, minimum guests, add-ons, available. Only available, priced packages are offered on bookings.
+
+## Owner: staff logins (Settings → Logins & staff)
+- **Add:** fill *Add a login* — name, username, a strong password (10+ characters), Access = **Staff** → Add login. Tell the person their username and password in person.
+- **Staff** can do all daily work (customers, bookings, quotations, payments, receipts, refunds up to the amount paid) but cannot open Settings or void payments/documents. **Owner** has full access.
+- **Deactivate:** click *Deactivate* under their name — they are signed out on every device at once. *Reactivate* brings the login back.
+- Forgotten password: type a new one under their name → *Change password*.
 
 ## If something goes wrong
 - Forgot password → owner: Settings → Login → Change password (signs out every device).

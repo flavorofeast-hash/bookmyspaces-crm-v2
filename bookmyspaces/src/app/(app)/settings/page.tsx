@@ -29,7 +29,7 @@ function SpaceFields({ s }: { s?: any }) {
 
 export default async function SettingsPage(props: { searchParams: Promise<{ ok?: string; err?: string; import?: string; added?: string }> }) {
   const searchParams = await props.searchParams
-  await requireOwner()
+  const me = await requireOwner()
   const [s, properties, spaces, slots, packages, users, replies, templates, legacy] = await Promise.all([
     getSettings(),
     q<any>(`SELECT * FROM crm.properties ORDER BY sort_order, name`),
@@ -192,20 +192,32 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
           </div>
         </Card>
 
-        <Card title="Shared login">
+        <Card title="Logins & staff">
           <div id="users" className="space-y-3 text-sm">
-            <p className="muted">The whole team signs in with one username and password. Changing the password signs out every device.</p>
-            {users.filter((u) => u.active).map((u) => (
-              <div key={u.id} className="space-y-2">
-                <p>Username: <b className="font-mono">{u.email}</b> · last sign-in {u.last_login_at ? fmtDateTime(u.last_login_at) : 'never'}
+            <p className="muted"><b>Owner</b> logins can open Settings and void payments or documents. <b>Staff</b> logins can handle customers, bookings, quotations, payments, receipts and refunds, but cannot open Settings or void anything. Changing a password signs out that login on every device.</p>
+            {users.map((u) => (
+              <div key={u.id} className="space-y-2 border-t border-slate-100 pt-3 first:border-0 first:pt-0">
+                <p><b>{u.name}</b> · username <b className="font-mono">{u.email}</b> · <b>{u.role === 'owner' ? 'Owner' : 'Staff'}</b>{!u.active && <span className="ml-2 text-red-700 font-medium">deactivated</span>} · last sign-in {u.last_login_at ? fmtDateTime(u.last_login_at) : 'never'}
                   {u.uses_default_password && <span className="ml-2 text-red-700 font-medium">still using the default password</span>}</p>
-                <form action={A.changeUsernameAction} className="flex flex-wrap gap-2 items-end"><Hidden name="user_id" value={u.id} />
-                  <Field label="New username"><input name="username" required minLength={3} className="input" autoCapitalize="none" /></Field><SubmitButton className="btn-secondary">Change username</SubmitButton></form>
-                <form action={A.resetPasswordAction} className="flex flex-wrap gap-2 items-end"><Hidden name="user_id" value={u.id} />
-                  <Field label="New password"><input type="password" name="password" minLength={8} required className="input" autoComplete="new-password" /></Field><SubmitButton className="btn-secondary">Change password</SubmitButton></form>
-                <form action={A.signOutAllAction}><Hidden name="user_id" value={u.id} /><SubmitButton className="btn-secondary btn-sm">Sign out all devices</SubmitButton></form>
+                {u.active && <>
+                  <form action={A.changeUsernameAction} className="flex flex-wrap gap-2 items-end"><Hidden name="user_id" value={u.id} />
+                    <Field label="New username"><input name="username" required minLength={3} className="input" autoCapitalize="none" /></Field><SubmitButton className="btn-secondary">Change username</SubmitButton></form>
+                  <form action={A.resetPasswordAction} className="flex flex-wrap gap-2 items-end"><Hidden name="user_id" value={u.id} />
+                    <Field label="New password"><input type="password" name="password" minLength={8} required className="input" autoComplete="new-password" /></Field><SubmitButton className="btn-secondary">Change password</SubmitButton></form>
+                  <form action={A.signOutAllAction}><Hidden name="user_id" value={u.id} /><SubmitButton className="btn-secondary btn-sm">Sign out all devices</SubmitButton></form>
+                </>}
+                {u.id !== me.id && <form action={A.toggleUserAction}><Hidden name="user_id" value={u.id} /><Hidden name="active" value={u.active ? 'false' : 'true'} />
+                  <SubmitButton className={u.active ? 'btn-danger btn-sm' : 'btn-secondary btn-sm'}>{u.active ? 'Deactivate (signs out at once)' : 'Reactivate'}</SubmitButton></form>}
               </div>))}
-            <p className="text-xs muted">The live CRM only accepts a strong password (10+ characters, not easy to guess).</p>
+            <form action={A.createUserAction} className="border-t border-slate-100 pt-3 grid sm:grid-cols-2 gap-2 items-end">
+              <p className="sm:col-span-2 font-medium">Add a login</p>
+              <Field label="Person's name"><input name="name" required className="input" /></Field>
+              <Field label="Username"><input name="username" required minLength={3} className="input" autoCapitalize="none" /></Field>
+              <Field label="Password"><input type="password" name="password" required minLength={10} className="input" autoComplete="new-password" /></Field>
+              <Field label="Access"><select name="role" defaultValue="staff" className="input"><option value="staff">Staff (no Settings, no voiding)</option><option value="owner">Owner (full access)</option></select></Field>
+              <div className="sm:col-span-2"><SubmitButton className="btn-primary">Add login</SubmitButton></div>
+            </form>
+            <p className="text-xs muted">The live CRM only accepts a strong password (10+ characters, not easy to guess). Give each person their own login; deactivate it when they leave.</p>
           </div>
         </Card>
 

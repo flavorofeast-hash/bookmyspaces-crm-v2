@@ -192,3 +192,17 @@ describe('shared team login (admin)', () => {
     expect(anon!.n).toBe(0)
   })
 })
+
+describe('owner-only actions', () => {
+  it('every Settings action and the payment/document void actions require the owner role', async () => {
+    const { readFileSync } = await import('node:fs')
+    const fns = (file: string) => readFileSync(file, 'utf8').split(/\n(?=export async function )/).filter((b) => b.startsWith('export async function '))
+    const settings = fns('src/app/(app)/settings/actions.ts')
+    expect(settings.length).toBeGreaterThan(10)
+    for (const b of settings) expect(b, b.slice(0, 60)).toMatch(/await requireOwner\(\)/)
+    const voids = fns('src/app/(app)/bookings/actions.ts').filter((b) => /^export async function void/.test(b))
+    expect(voids.length).toBe(2)
+    for (const b of voids) expect(b).toMatch(/await requireOwner\(\)/)
+    expect(readFileSync('src/app/(app)/settings/page.tsx', 'utf8')).toMatch(/await requireOwner\(\)/)
+  })
+})
