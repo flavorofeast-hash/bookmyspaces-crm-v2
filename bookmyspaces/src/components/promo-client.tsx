@@ -218,7 +218,7 @@ export function VideoMaker({ promotionId, photos, text, fileBase }: { promotionI
       const { Muxer, ArrayBufferTarget } = await import('mp4-muxer')
       let codec = ''
       for (const c of ['avc1.640028', 'avc1.4D4028', 'avc1.42E028', 'avc1.42E01F']) {
-        const s = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, bitrate: 5_000_000, framerate: fps })
+        const s = await VideoEncoder.isConfigSupported({ codec: c, width: W, height: H, bitrate: 3_500_000, framerate: fps })
         if (s.supported) { codec = c; break }
       }
       if (!codec) throw new Error('This browser cannot encode MP4 (H.264) video. Use Google Chrome or Microsoft Edge.')
@@ -235,7 +235,7 @@ export function VideoMaker({ promotionId, photos, text, fileBase }: { promotionI
         ...(audio && aCodec ? { audio: { codec: aCodec, numberOfChannels: 2, sampleRate: aRate } } : {}) })
       let failure: Error | null = null
       const enc = new VideoEncoder({ output: (c, m) => muxer.addVideoChunk(c, m), error: (e) => { failure = e as Error } })
-      enc.configure({ codec, width: W, height: H, bitrate: fmt === '1:1' ? 5_000_000 : 4_000_000, framerate: fps, avc: { format: 'avc' } })
+      enc.configure({ codec, width: W, height: H, bitrate: fmt === '1:1' ? 3_500_000 : 2_500_000, framerate: fps, avc: { format: 'avc' } })
       const canvas = document.createElement('canvas'); canvas.width = W; canvas.height = H
       const ctx = canvas.getContext('2d')!
       const intro = 2.5 * fps, outro = 3 * fps, body = total - intro - outro, per = body / imgs.length, fade = Math.min(0.6 * fps, per / 3)
