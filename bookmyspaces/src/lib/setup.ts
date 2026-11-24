@@ -104,19 +104,7 @@ export async function updateSpace(f: FormData, actor?: Actor) {
   }
 }
 
-export async function savePackage(f: FormData) {
-  const id = s(f.get('id')), name = s(f.get('name'))
-  if (!name) throw new Error('Package name is required.')
-  const vals = [name, s(f.get('description')), n(f.get('price')), s(f.get('price_basis')) ?? 'per_person', f.get('active') !== 'off',
-    s(f.get('property_id')), n(f.get('min_guests')), s(f.get('add_ons'))]
-  try {
-    if (id) await q(`UPDATE crm.packages SET name=$2, description=$3, price=$4, price_basis=$5, active=$6, property_id=$7, min_guests=$8, add_ons=$9 WHERE id=$1`, [id, ...vals])
-    else await q(`INSERT INTO crm.packages (name, description, price, price_basis, active, property_id, min_guests, add_ons) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, vals)
-  } catch (e) {
-    if (isPgError(e, '23505')) throw new Error(`A package named “${name}” already exists.`)
-    throw e
-  }
-}
+export { savePackage } from './catalogue'
 
 export async function saveSlot(f: FormData) {
   const id = s(f.get('id')), name = s(f.get('name')), st = s(f.get('start_time')), en = s(f.get('end_time'))
@@ -190,4 +178,17 @@ export async function setUserActive(userId: string, active: boolean, actingUserI
     if (target?.role === 'owner' && !owners?.n) throw new Error('At least one active owner is required.')
   }
   await q(`UPDATE crm.app_users SET active = $2, session_version = session_version + 1 WHERE id = $1`, [userId, active])
+}
+
+/** Owner changes someone's access. The last active owner cannot be made staff. Signs that login out everywhere. */
+export async function setUserRole(userId: string, role: 'owner' | 'staff', actor: { id: string }) {
+  if (userId === actor.id) throw new Error('You cannot change your own access.')
+  if (role === 'staff') {
+    const owners = await q1<{ n: number }>(`SELECT count(*)::int AS n FROM crm.app_users WHERE role = 'owner' AND active AND id <> $1`, [userId])
+    if (!owners?.n) throw new Error('At least one active owner is required.')
+  }
+  const u = await q1<{ name: string; role: string }>(`SELECT name, role FROM crm.app_users WHERE id = $1`, [userId])
+  if (!u) throw new Error('User not found.')
+  await q(`UPDATE crm.app_users SET role = $2, session_version = session_version + 1 WHERE id = $1`, [userId, role])
+  await q(`INSERT INTO crm.activity (user_id, action, detail) VALUES ($1, 'user_access_changed', $2)`, [actor.id, `${u.name}: ${u.role} → ${role}`])
 }

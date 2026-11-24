@@ -1,6 +1,7 @@
 'use server'
 
 import { requireUser, requireOwner } from '@/lib/auth'
+import { addCatalogueItem } from '@/lib/catalogue'
 import { createBooking, setBookingStatus, addBookingItem, removeBookingItem, updateBookingDetails } from '@/lib/bookings'
 import { issueStatement, recordPayment, recordRefund, voidPayment, voidDocument } from '@/lib/billing'
 import { run, str, num, safeBack } from '@/lib/action'
@@ -119,4 +120,13 @@ export async function voidPaymentAction(f: FormData) {
 export async function voidDocumentAction(f: FormData) {
   const u = await requireOwner()
   await run(`/bookings/${bk(f)}`, 'Document voided.', async () => { await voidDocument(str(f, 'document_id'), str(f, 'reason'), u.id) })
+}
+
+export async function addCatalogueAction(f: FormData) {
+  const u = await requireUser()
+  await run(`/bookings/${bk(f)}`, 'Added to the booking.', async () => {
+    const [type, id] = str(f, 'item').split(':')
+    if (!id || (type !== 'package' && type !== 'addon')) throw new Error('Choose a package or add-on.')
+    await addCatalogueItem(bk(f), { type, id, price: num(f, 'price'), qty: num(f, 'qty') }, u.id)
+  })
 }

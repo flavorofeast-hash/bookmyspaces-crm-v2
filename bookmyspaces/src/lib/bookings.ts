@@ -174,12 +174,13 @@ export async function createBooking(input: NewBookingInput, userId?: string | nu
       if (input.event) await addSpaceLines(db, id, input.event.spaceIds, input.event.start, input.event.end, { nights: 1, hours: input.event.hours, guests })
       if (input.rooms) await addSpaceLines(db, id, input.rooms.spaceIds, input.rooms.start, input.rooms.end, { nights: input.rooms.nights, hours: 0, guests })
       if (input.packageId) {
-        const p = await q1<{ name: string; price: string | null; price_basis: string }>(`SELECT name, price, price_basis FROM crm.packages WHERE id = $1`, [input.packageId], db)
-        if (p && p.price === null) throw new Error(`The “${p.name}” package has no price yet. Set it in Settings → Packages first.`)
+        const p = await q1<{ name: string; price: string | null; price_basis: string; active: boolean; review_status: string; min_guests: number | null; inclusions: string[] | null }>(
+          `SELECT name, price, price_basis, active, review_status, min_guests, inclusions FROM crm.packages WHERE id = $1`, [input.packageId], db)
+        if (p && (p.price === null || !p.active || p.review_status !== 'approved')) throw new Error(`The “${p.name}” package is not approved and available yet (Packages & Food).`)
         if (p) {
-          const qty = p.price_basis === 'per_person' ? Math.max(1, guests) : 1
+          const qty = p.price_basis === 'per_person' ? Math.max(1, guests, Number(p.min_guests ?? 0)) : 1
           await q(`INSERT INTO crm.booking_items (booking_id, line_type, description, qty, unit_price, sort_order) VALUES ($1,'package',$2,$3,$4,50)`,
-            [id, `${p.name} package` + (p.price_basis === 'per_person' ? ` (${qty} guests)` : ''), qty, p.price], db)
+            [id, `${p.name} package` + (p.price_basis === 'per_person' ? ` (${qty} guests)` : '') + (p.inclusions?.length ? ` — includes: ${p.inclusions.join(', ')}` : ''), qty, p.price], db)
         }
       }
       await recalcBooking(id, db)

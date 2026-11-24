@@ -8,7 +8,7 @@ export async function todayData(now = new Date()) {
   const weekEnd = istToDate(addDays(today, 8), '00:00')
   const monthStart = istToDate(today.slice(0, 8) + '01', '00:00')
 
-  const [followUps, newEnquiries, unread, checkIns, checkOuts, eventsToday, upcomingRooms, upcomingEvents, spaces, money, dueSoon, activity] = await Promise.all([
+  const [followUps, newEnquiries, unread, checkIns, checkOuts, eventsToday, upcomingRooms, upcomingEvents, spaces, money, dueSoon, activity, quoted] = await Promise.all([
     q<any>(`SELECT f.*, c.name AS customer_name, c.phone FROM crm.follow_ups f JOIN crm.customers c ON c.id = f.customer_id
             WHERE f.done_at IS NULL AND f.due_on <= $1::date ORDER BY f.due_on, f.created_at LIMIT 30`, [today]),
     q<any>(`SELECT c.id, c.name, c.phone, c.source, c.created_at, c.requirements,
@@ -55,8 +55,11 @@ export async function todayData(now = new Date()) {
     q<any>(`SELECT b.id, b.ref, b.start_at, c.name AS customer_name, bb.balance FROM crm.bookings b
             JOIN crm.customers c ON c.id = b.customer_id JOIN crm.booking_balances bb ON bb.booking_id = b.id
             WHERE b.status = 'confirmed' AND bb.balance > 0 AND b.start_at < $1 ORDER BY b.start_at LIMIT 10`, [weekEnd]),
-    q<any>(`SELECT a.*, c.name AS customer_name, b.ref FROM crm.activity a LEFT JOIN crm.customers c ON c.id = a.customer_id
-            LEFT JOIN crm.bookings b ON b.id = a.booking_id ORDER BY a.at DESC LIMIT 15`),
+    q<any>(`SELECT a.*, c.name AS customer_name, b.ref, u.name AS user_name FROM crm.activity a LEFT JOIN crm.customers c ON c.id = a.customer_id
+            LEFT JOIN crm.bookings b ON b.id = a.booking_id LEFT JOIN crm.app_users u ON u.id = a.user_id ORDER BY a.at DESC LIMIT 15`),
+    q<any>(`SELECT b.id, b.ref, b.start_at, b.total, c.id AS customer_id, c.name AS customer_name, COALESCE(c.whatsapp, c.phone) AS phone, au.name AS assigned
+            FROM crm.bookings b JOIN crm.customers c ON c.id = b.customer_id LEFT JOIN crm.app_users au ON au.id = b.assigned_to
+            WHERE b.status = 'quoted' AND b.end_at > now() ORDER BY b.start_at LIMIT 15`),
   ])
-  return { today, followUps, newEnquiries, unread, checkIns, checkOuts, eventsToday, upcomingRooms, upcomingEvents, spaces, money, dueSoon, activity }
+  return { today, followUps, newEnquiries, unread, checkIns, checkOuts, eventsToday, upcomingRooms, upcomingEvents, spaces, money, dueSoon, activity, quoted }
 }

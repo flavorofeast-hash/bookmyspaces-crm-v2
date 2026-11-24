@@ -44,7 +44,7 @@ export default async function NewBookingPage(props: { searchParams: Promise<SP> 
     sp.customer ? q1<any>(`SELECT id, name, phone FROM crm.customers WHERE id = $1`, [sp.customer]).catch(() => null) : null,
     q<any>(`SELECT id, name, start_time::text AS st, end_time::text AS et FROM crm.event_slots ORDER BY sort_order`),
     q<any>(`SELECT pk.id, pk.name, pk.price, pk.price_basis FROM crm.packages pk LEFT JOIN crm.properties p ON p.id = pk.property_id
-      WHERE pk.active AND pk.price IS NOT NULL AND (pk.property_id IS NULL OR p.food_packages_enabled) ORDER BY pk.name`),
+      WHERE pk.active AND pk.review_status = 'approved' AND pk.price IS NOT NULL AND (pk.property_id IS NULL OR p.food_packages_enabled OR pk.kind = 'event') ORDER BY pk.name`),
     sp.customer ? [] : q<any>(`SELECT id, name, phone FROM crm.customers ORDER BY updated_at DESC LIMIT 300`),
     q1<any>(`SELECT checkin_time::text AS ci, checkout_time::text AS co FROM crm.business_settings WHERE id = 1`),
   ])

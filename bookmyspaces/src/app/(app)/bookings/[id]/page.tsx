@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import { getBooking, listSpaces } from '@/lib/bookings'
 import { requireUser } from '@/lib/auth'
 import { q } from '@/lib/db'
-import { setStatusAction, addItemAction, removeItemAction, updateDetailsAction, issueDocAction, recordPaymentAction, recordRefundAction, voidPaymentAction, voidDocumentAction } from '../actions'
+import { addCatalogueAction, setStatusAction, addItemAction, removeItemAction, updateDetailsAction, issueDocAction, recordPaymentAction, recordRefundAction, voidPaymentAction, voidDocumentAction } from '../actions'
 import { addFollowUpAction } from '../../customers/actions'
 import { PageHeader, Card, Flash, Badge, Empty, Hidden, Field, Reveal } from '@/components/ui'
 import { SubmitButton } from '@/components/client'
@@ -17,10 +17,13 @@ export default async function BookingPage(props: { params: Promise<{ id: string 
   const user = await requireUser()
   const b = await getBooking(params.id).catch(() => null)
   if (!b) notFound()
-  const [spaces, followUps, staff] = await Promise.all([
+  const [spaces, followUps, staff, catPackages, catAddons, createdBy] = await Promise.all([
     listSpaces(),
     q<any>(`SELECT * FROM crm.follow_ups WHERE booking_id = $1 AND done_at IS NULL ORDER BY due_on`, [b.id]),
     q<{ id: string; name: string }>(`SELECT id, name FROM crm.app_users WHERE active OR id = $1 ORDER BY name`, [b.assigned_to]),
+    q<any>(`SELECT id, name, kind, price, price_basis, min_guests, inclusions FROM crm.packages WHERE active AND review_status = 'approved' AND price IS NOT NULL ORDER BY kind, name`),
+    q<any>(`SELECT id, name, category, price_min, price_max, unit FROM crm.addons WHERE active AND review_status = 'approved' AND price_min IS NOT NULL ORDER BY category, name`),
+    b.created_by ? q<{ name: string }>(`SELECT name FROM crm.app_users WHERE id = $1`, [b.created_by]) : Promise.resolve([] as { name: string }[]),
   ])
   const editable = !['completed', 'cancelled'].includes(b.status)
   const isOwner = user.role === 'owner'
@@ -224,9 +227,28 @@ export default async function BookingPage(props: { params: Promise<{ id: string 
             </form>
           </Card>
 
+          {editable && <Card title="Add package, food or add-on">
+            {catPackages.length + catAddons.length === 0 ? <p className="text-sm muted">Nothing is approved and available yet. The owner approves items on <Link href="/catalogue" className="link">Packages &amp; Food</Link>.</p> : (
+              <form action={addCatalogueAction} className="space-y-2">
+                <Hidden name="booking_id" value={b.id} />
+                <Field label="Item"><select name="item" required className="input">
+                  {catPackages.length > 0 && <optgroup label="Packages & food">{catPackages.map((p) => <option key={p.id} value={`package:${p.id}`}>{p.name} — {inr(p.price)} {p.price_basis === 'per_person' ? `per guest${p.min_guests ? ` (min ${p.min_guests})` : ''}` : 'flat'}</option>)}</optgroup>}
+                  {catAddons.length > 0 && <optgroup label="Decoration & add-ons">{catAddons.map((a) => <option key={a.id} value={`addon:${a.id}`}>{a.name} — {inr(a.price_min)}{Number(a.price_max) !== Number(a.price_min) ? `–${inr(a.price_max)}` : ''}{a.unit === 'per_person' ? ' per guest' : ''}</option>)}</optgroup>}
+                </select></Field>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="Price (₹)" hint="Add-ons with a range only; empty = lowest"><input type="number" name="price" min={0} className="input" /></Field>
+                  <Field label="Quantity / guests" hint="Per-guest items: empty = booking guests"><input type="number" name="qty" min={1} className="input" /></Field>
+                </div>
+                <SubmitButton className="btn-secondary btn-sm">Add to booking</SubmitButton>
+                <p className="text-xs muted">A package line lists what it includes — don’t add those items again separately.</p>
+              </form>
+            )}
+          </Card>}
+
           <Card title="Details">
             <form action={updateDetailsAction} className="space-y-2">
               <Hidden name="booking_id" value={b.id} />
+              {createdBy[0] && <p className="text-xs muted">Created by {createdBy[0].name}</p>}
               <Field label="Assigned to"><select name="assigned_to" defaultValue={b.assigned_to ?? ''} className="input"><option value="">Not assigned</option>{staff.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
               <Field label="Occasion"><select name="event_type" defaultValue={b.event_type ?? ''} className="input"><option value="">—</option>{Array.from(new Set([...EVENT_TYPES, ...(b.event_type ? [b.event_type] : [])])).map((e) => <option key={e}>{e}</option>)}</select></Field>
               <Field label="Guests"><input type="number" name="guests" min={0} defaultValue={b.guests ?? ''} className="input" /></Field>

@@ -12,6 +12,7 @@ const ICONS: Record<string, string> = {
   inbox: 'M4 5h16v11H8l-4 4V5z',
   marketing: 'M3 11l15-6v14L3 13v-2zm4 3v4a2 2 0 004 0v-3',
   rates: 'M12 3v18M17 7H9.5a3 3 0 000 6h5a3 3 0 010 6H6',
+  catalogue: 'M4 6h16M4 12h16M4 18h7m5 0l2 2 4-4',
 }
 
 export const NAV = [
@@ -21,6 +22,7 @@ export const NAV = [
   { href: '/billing', label: 'Billing', icon: 'billing' },
   { href: '/inbox', label: 'Inbox', icon: 'inbox' },
   { href: '/marketing', label: 'Marketing', icon: 'marketing' },
+  { href: '/catalogue', label: 'Packages & Food', icon: 'catalogue', mobileTop: true },
   { href: '/rates', label: 'Rates', icon: 'rates', mobileTop: true },
 ]
 
@@ -63,6 +65,7 @@ export function Nav({ unread, userName, isOwner, businessName }: { unread: numbe
       <header className="no-print md:hidden sticky top-0 z-20 flex items-center justify-between bg-slate-900 text-white px-4 py-3">
         <span className="font-semibold">{businessName}</span>
         <div className="flex items-center gap-3 text-sm">
+          <Link href="/catalogue" className="text-slate-300">Packages</Link>
           <Link href="/rates" className="text-slate-300">Rates</Link>
           {isOwner && <Link href="/settings" className="text-slate-300">Settings</Link>}
           <form action="/logout" method="post"><button className="text-slate-300">Sign out</button></form>

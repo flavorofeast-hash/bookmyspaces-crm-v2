@@ -5,7 +5,7 @@ import { completeFollowUpAction } from '../customers/actions'
 import { PageHeader, Card, Flash, Empty, Stat, Hidden, Badge } from '@/components/ui'
 import { SubmitButton } from '@/components/client'
 import { inr, fmtDate, fmtTime, fmtDay, fmtDateTime, SOURCE_LABEL, STATUS_LABEL } from '@/lib/format'
-import { formatPhone } from '@/lib/phone'
+import { formatPhone, waLink } from '@/lib/phone'
 import { BookingCalendar, type CalParams } from '@/components/booking-calendar'
 
 export default async function TodayPage(props: { searchParams: Promise<{ ok?: string; err?: string } & CalParams> }) {
@@ -13,7 +13,7 @@ export default async function TodayPage(props: { searchParams: Promise<{ ok?: st
   const searchParams = await props.searchParams
   const d = await todayData()
   const free = d.spaces.filter((s) => !s.busy)
-  const attention = d.followUps.length + d.newEnquiries.length + d.unread.length + d.dueSoon.length
+  const attention = d.followUps.length + d.newEnquiries.length + d.unread.length + d.dueSoon.length + d.quoted.length
   const freeBy = (kind: string) => free.filter((s) => (kind === 'room' ? s.kind === 'room' : s.kind !== 'room'))
   return (
     <>
@@ -49,6 +49,18 @@ export default async function TodayPage(props: { searchParams: Promise<{ ok?: st
                   {c.requirements && <span className="block text-xs muted line-clamp-1">{c.requirements}</span>}</span>
                 {c.booking_id ? <Link href={`/bookings/${c.booking_id}`}><Badge value={c.booking_status} label={STATUS_LABEL[c.booking_status]} /></Link>
                   : <Link href={`/bookings/new?customer=${c.id}`} className="btn-secondary btn-sm">Create booking</Link>}
+              </li>))}</ul>
+          )}
+        </Card>
+
+        <Card title={`Quotations awaiting reply (${d.quoted.length})`}>
+          {d.quoted.length === 0 ? <Empty>None.</Empty> : (
+            <ul className="divide-y divide-slate-100">{d.quoted.map((b: any) => (
+              <li key={b.id} className="py-2 text-sm flex flex-wrap items-center gap-x-2 gap-y-1">
+                <Link href={`/bookings/${b.id}`} className="link font-medium">{b.ref}</Link>
+                <Link href={`/customers/${b.customer_id}`} className="link">{b.customer_name}</Link>
+                <span className="text-xs muted">{fmtDate(b.start_at)} · {inr(b.total)}{b.assigned ? ` · ${b.assigned}` : ''}</span>
+                {b.phone && <span className="ml-auto flex gap-1"><a href={`tel:+${b.phone}`} className="btn-secondary btn-sm">Call</a><a href={waLink(b.phone, '') ?? undefined} target="_blank" rel="noreferrer" className="btn-secondary btn-sm">WhatsApp</a></span>}
               </li>))}</ul>
           )}
         </Card>
@@ -93,7 +105,7 @@ export default async function TodayPage(props: { searchParams: Promise<{ ok?: st
         <Card title="Recent activity" className="lg:col-span-2">
           {d.activity.length === 0 ? <Empty>No activity yet.</Empty> : (
             <ul className="space-y-1 text-sm">{d.activity.map((a) => (
-              <li key={a.id}><span className="text-xs muted">{fmtDateTime(a.at)}</span> — {a.action.replace(/_/g, ' ')}{a.customer_name ? <> · <Link href={`/customers/${a.customer_id}`} className="link">{a.customer_name}</Link></> : ''}{a.ref ? <> · <Link href={`/bookings/${a.booking_id}`} className="link">{a.ref}</Link></> : ''}{a.detail ? <span className="muted"> — {a.detail}</span> : ''}</li>))}</ul>
+              <li key={a.id}><span className="text-xs muted">{fmtDateTime(a.at)}</span> — {a.action.replace(/_/g, ' ')}{a.customer_name ? <> · <Link href={`/customers/${a.customer_id}`} className="link">{a.customer_name}</Link></> : ''}{a.ref ? <> · <Link href={`/bookings/${a.booking_id}`} className="link">{a.ref}</Link></> : ''}{a.detail ? <span className="muted"> — {a.detail}</span> : ''}{a.user_name ? <span className="text-xs muted"> · by {a.user_name}</span> : ''}</li>))}</ul>
           )}
         </Card>
       </div>

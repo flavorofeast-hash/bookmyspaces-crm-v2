@@ -165,33 +165,7 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
         </Card>
 
         <Card title="Food & event packages">
-          <div id="packages" className="space-y-3">
-            <p className="text-xs muted">Packages appear on bookings only when they have a price and their property has “Food packages” ticked (Properties above).</p>
-            {packages.map((p) => (
-              <form key={p.id} action={A.savePackageAction} className="grid sm:grid-cols-6 gap-2 items-end border-b border-slate-100 pb-3">
-                <Hidden name="id" value={p.id} />
-                <Field label="Package name"><input name="name" defaultValue={p.name} className="input" /></Field>
-                <Field label="Property"><select name="property_id" defaultValue={p.property_id ?? ''} className="input"><option value="">All properties</option>{properties.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}</option>)}</select></Field>
-                <Field label="Menu / what’s included" className="sm:col-span-2"><input name="description" defaultValue={p.description ?? ''} placeholder="NOT CONFIGURED" className="input" /></Field>
-                <Field label="Price (₹)"><input type="number" name="price" min={0} defaultValue={p.price === null ? '' : Number(p.price)} placeholder="NOT CONFIGURED" className="input" /></Field>
-                <Field label="Price is"><select name="price_basis" defaultValue={p.price_basis} className="input"><option value="per_person">per guest</option><option value="flat">flat</option></select></Field>
-                <Field label="Minimum guests"><input type="number" name="min_guests" min={0} defaultValue={p.min_guests ?? ''} placeholder="NOT CONFIGURED" className="input" /></Field>
-                <Field label="Optional add-ons" className="sm:col-span-2"><input name="add_ons" defaultValue={p.add_ons ?? ''} placeholder="e.g. DJ ₹5,000, decoration ₹3,000" className="input" /></Field>
-                <Field label="Availability"><select name="active" defaultValue={p.active ? 'on' : 'off'} className="input"><option value="on">Available</option><option value="off">Not available</option></select></Field>
-                <SubmitButton className="btn-secondary">Save</SubmitButton>
-              </form>
-            ))}
-            <form action={A.savePackageAction} className="grid sm:grid-cols-6 gap-2 items-end">
-              <Field label="New package"><input name="name" required className="input" /></Field>
-              <Field label="Property"><select name="property_id" className="input"><option value="">All properties</option>{properties.map((pr) => <option key={pr.id} value={pr.id}>{pr.name}</option>)}</select></Field>
-              <Field label="Menu / what’s included" className="sm:col-span-2"><input name="description" className="input" /></Field>
-              <Field label="Price (₹)"><input type="number" name="price" min={0} placeholder="NOT CONFIGURED" className="input" /></Field>
-              <Field label="Price is"><select name="price_basis" className="input"><option value="per_person">per guest</option><option value="flat">flat</option></select></Field>
-              <Field label="Minimum guests"><input type="number" name="min_guests" min={0} className="input" /></Field>
-              <Field label="Optional add-ons" className="sm:col-span-2"><input name="add_ons" className="input" /></Field>
-              <SubmitButton>Add</SubmitButton>
-            </form>
-          </div>
+          <p id="packages" className="text-sm">Packages, food menus, decoration and add-ons are managed on the <a href="/catalogue" className="link">Packages &amp; Food</a> page.</p>
         </Card>
 
         <Card title="Logins & staff">
@@ -208,6 +182,8 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
                     <Field label="New password"><input type="password" name="password" minLength={8} required className="input" autoComplete="new-password" /></Field><SubmitButton className="btn-secondary">Change password</SubmitButton></form>
                   <form action={A.signOutAllAction}><Hidden name="user_id" value={u.id} /><SubmitButton className="btn-secondary btn-sm">Sign out all devices</SubmitButton></form>
                 </>}
+                {u.id !== me.id && u.active && <form action={A.setRoleAction} className="flex gap-2 items-end"><Hidden name="user_id" value={u.id} />
+                  <Field label="Access"><select name="role" defaultValue={u.role} className="input"><option value="staff">Staff</option><option value="owner">Owner</option></select></Field><SubmitButton className="btn-secondary btn-sm">Change access</SubmitButton></form>}
                 {u.id !== me.id && <form action={A.toggleUserAction}><Hidden name="user_id" value={u.id} /><Hidden name="active" value={u.active ? 'false' : 'true'} />
                   <SubmitButton className={u.active ? 'btn-danger btn-sm' : 'btn-secondary btn-sm'}>{u.active ? 'Deactivate (signs out at once)' : 'Reactivate'}</SubmitButton></form>}
               </div>))}
