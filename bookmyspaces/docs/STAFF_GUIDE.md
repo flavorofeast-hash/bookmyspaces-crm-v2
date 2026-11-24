@@ -1,44 +1,59 @@
 # BookMySpaces CRM — staff guide
 
-**Address:** https://bookmyspaces-crm-next.vercel.app (any browser, phone or computer)
-**Login:** your own username and password from the owner. Never share it.
+**Address:** https://bookmyspaces-crm-next.vercel.app (phone or computer). Start every day on **Today**.
 
-## Daily procedure (5 steps)
-1. **Morning — open Today.** Work through new enquiries, follow-ups due, today's check-ins/events and unpaid balances.
-2. **New enquiry (phone, walk-in, WhatsApp, Facebook, Instagram):** Customers → search the mobile number. Not found → `+ Add customer` (the same number is never added twice). Add a follow-up date if they need a call back.
-3. **Check availability and save:** on the customer page → `+ New booking / enquiry` → choose type and dates → **Check availability**. Booked spaces are greyed out; spaces marked **Not configured** cannot be booked until the owner fills in their price in Settings. Tick spaces → **Save as enquiry** (nothing blocked) or **Save and issue quotation**. On the booking page, set **Assigned to** (Details card) for the person handling it.
-4. **Customer agrees:** booking page → **Record payment** → kind *Advance*, tick *Also confirm the booking* → receipt is created; send it with the WhatsApp link. Two people can never confirm the same space at the same time.
-5. **Event day / check-out:** add any extra items → **Issue final bill** → record *Balance payment* → **Mark completed** when balance is ₹0.
+## 1. Log in
+Enter your own username and password (from the owner) → **Sign in**. Never share your login. **Sign out** is at the top right (phone) or bottom left (computer).
 
-**Change of plan:** add/remove items on the booking page (old quotations stay as they were; issue a revised quotation). **Cancellation:** Cancel booking (reason required) → **Record refund** (cannot exceed what was paid; refund note created). No GST is charged.
+## 2. Find a customer
+**Customers** → type the name or mobile number → **Search**. Click the name to see everything: enquiries, bookings, quotations, payments, balance and follow-ups.
 
-## Menu
-- **Today** — what needs attention now.
-- **Customers** — search by name or mobile; each customer page shows all enquiries, bookings, documents, payments and follow-ups.
-- **Bookings** — calendar and list (filter by status; "→ name" shows who it is assigned to).
-- **Billing** — all outstanding balances and documents.
-- **Inbox** — WhatsApp chats (not connected yet; record WhatsApp enquiries manually as above).
-- **Marketing** — campaigns with tracking links and a post calendar (posting to Facebook/Instagram is manual until connected).
-- **Settings** (owner only) — business details, properties, rooms & spaces, prices, time slots, food packages, staff logins.
+## 3. Add a new customer
+**Customers → + Add customer** (or **Today → + New enquiry**). Name and mobile are enough; add what they want under *Requirements*. If the mobile already exists, the CRM opens that customer instead of making a duplicate.
 
-## Rates (menu → Rates, any login)
-- Each room/space shows the owner's **allowed range**. Type a **Standard** rate and, if needed, a different rate for any weekday (Mon–Sun) → **Save**. Empty weekday = standard rate applies.
-- **Date-specific rates** (festivals, weddings season): choose room/space, date and rate. A date rate beats the weekday rate, which beats the standard rate.
-- A rate outside the range is refused. Every change is saved in **Price history** with your name and login — it cannot be edited or deleted.
-- New bookings use the rate for each night/date. Quotations and bills already issued never change.
+## 4. Record an enquiry
+On the customer page → **+ New booking / enquiry** → choose the type (event, room stay, or both) and the dates → **Check availability** → tick the rooms/spaces → **Save as enquiry**. Nothing is blocked yet.
 
-## Owner: completing inventory (Settings)
-- **Rooms & spaces** → **Edit** on a row: name, category, capacity, max occupancy, **minimum and maximum price**, standard rate, pricing unit, facilities, description, booking rules, active. A space is bookable only when it is **active, has a standard rate and a confirmed pricing unit**.
-- **Properties** → booking rules, **Food packages** switch.
-- **Packages** → name, property, menu, price per person, minimum guests, add-ons, available. Only available, priced packages are offered on bookings.
+## 5. Check availability
+On the new-booking page after **Check availability**: *Free* can be booked; *Booked* (greyed out) is taken; *Not configured* means the owner has not set a rate yet. The **Today** calendar shows every booking by month or week (filter by property or room).
 
-## Owner: staff logins (Settings → Logins & staff)
-- **Add:** fill *Add a login* — name, username, a strong password (10+ characters), Access = **Staff** → Add login. Tell the person their username and password in person.
-- **Staff** can do all daily work (customers, bookings, quotations, payments, receipts, refunds up to the amount paid) but cannot open Settings or void payments/documents. **Owner** has full access.
-- **Deactivate:** click *Deactivate* under their name — they are signed out on every device at once. *Reactivate* brings the login back.
-- Forgotten password: type a new one under their name → *Change password*.
+## 6. Create (confirm) a booking
+On the booking page → **Record payment** with *Also confirm the booking* ticked, or **Confirm booking**. The CRM never lets two people confirm the same room/space for the same time.
 
-## If something goes wrong
-- Forgot password → owner: Settings → Login → Change password (signs out every device).
-- Phone lost → owner: **Sign out all devices**, then change the password.
-- Payments and documents are never deleted; they can only be voided with a reason.
+## 7. Prepare a quotation
+Booking page → set **Guests** (Details card) → add items (step 8) → set **Discount** if approved → **Issue quotation**. Send it with **WhatsApp** or the customer link. Once issued, a quotation never changes; after changes, issue a revised quotation.
+
+## 8. Add food, packages and decoration
+Booking page → **Add package, food or add-on** → choose the item → (for decoration with a price range, type the agreed price) → **Add to booking**. Per-guest menus use the guest count (and the menu's minimum guests). A package line lists what it already includes — don't add those items again. Only items the owner has **Approved** appear here (see **Packages & Food**).
+
+## 9. Collect an advance
+Booking page → **Record payment** → kind *Advance*, amount, method (cash/UPI/…) → **Record payment & issue receipt**.
+
+## 10. Issue a receipt
+A receipt is created automatically with every payment. Open it with **View / print** or send it on WhatsApp.
+
+## 11. Collect the balance
+Event day / check-out → **Issue final bill** → **Record payment** kind *Balance payment* → when *Balance due* is ₹0 → **Mark completed**.
+
+## 12. Cancel a booking
+Booking page → **Cancel booking** → type the reason → confirm. If money was paid → **Record refund** (cannot exceed what was paid; a refund note is created). Payments and documents are never deleted.
+
+## 13. Check the calendar
+**Today → Booking calendar**: ← / → / **Today**, **Month** or **Week**, filter by property or room. Green = confirmed, dashed amber with "?" = enquiry/quotation, grey = completed. Click a booking to open it; click a date to start a new booking on that date.
+
+## 14. Update rates
+**Rates** → type the standard rate and any weekday rates → **Save**; add date-specific rates below. You can only use prices inside the owner's range. Every change is recorded with your name.
+
+## 15. Assign work
+Booking page → Details → **Assigned to** → choose the person → **Save details**. The bookings list and Today show who is handling what.
+
+## 16. Follow up with customers
+Customer or booking page → **Add follow-up** (date + note). **Today** lists follow-ups due (overdue in red) and **Quotations awaiting reply** with **Call** and **WhatsApp** buttons. Click **Done** after the call.
+
+---
+
+## Owner only
+- **Settings → Rooms & spaces:** min/max price, standard rate, pricing unit, capacity, facilities. A space is bookable only with a rate and a confirmed unit.
+- **Packages & Food:** check each item marked **OWNER REVIEW REQUIRED** (prices from the old handbook), correct it, set *Status = Approved* and tick *Available*. Fill in buffet menus and per-guest prices. *Historical* items are kept for reference only.
+- **Settings → Logins & staff:** add a login per person (Access = Staff), change access, deactivate when someone leaves.
+- Old-CRM proposals, invoices and payments are listed read-only at the bottom of **Packages & Food**; they are not counted in Billing.

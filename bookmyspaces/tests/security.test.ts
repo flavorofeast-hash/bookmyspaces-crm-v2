@@ -206,3 +206,21 @@ describe('owner-only actions', () => {
     expect(readFileSync('src/app/(app)/settings/page.tsx', 'utf8')).toMatch(/await requireOwner\(\)/)
   })
 })
+
+describe('owner changes staff access', () => {
+  it('promotes/demotes with a forced re-login, never demotes the last owner or yourself, and logs who did it', async () => {
+    const { setUserRole } = await import('@/lib/setup')
+    const o = (await q1<{ id: string }>(`INSERT INTO crm.app_users (email, name, role, password_hash) VALUES ('role-owner','Role Owner','owner','x') RETURNING id`))!.id
+    const s = (await q1<{ id: string; v: number }>(`INSERT INTO crm.app_users (email, name, role, password_hash) VALUES ('role-staff','Role Staff','staff','x') RETURNING id, session_version AS v`))!
+    await setUserRole(s.id, 'owner', { id: o })
+    const after = await q1<any>(`SELECT role, session_version FROM crm.app_users WHERE id = $1`, [s.id])
+    expect(after.role).toBe('owner'); expect(after.session_version).toBe(s.v + 1)
+    await expect(setUserRole(o, 'staff', { id: o })).rejects.toThrow(/own access/)
+    await setUserRole(s.id, 'staff', { id: o })
+    expect((await q1<any>(`SELECT detail FROM crm.activity WHERE action = 'user_access_changed' AND user_id = $1 ORDER BY id DESC LIMIT 1`, [o])).detail).toBe('Role Staff: owner → staff')
+    await q(`UPDATE crm.app_users SET active = false WHERE role = 'owner' AND id <> $1`, [o])
+    const s2 = (await q1<{ id: string }>(`INSERT INTO crm.app_users (email, name, role, password_hash) VALUES ('role-x','X','owner','x') RETURNING id`))!.id
+    await q(`UPDATE crm.app_users SET active = false WHERE id = $1`, [o])
+    await expect(setUserRole(s2, 'staff', { id: s.id })).rejects.toThrow(/At least one active owner/)
+  })
+})
