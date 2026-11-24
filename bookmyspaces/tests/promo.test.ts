@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { resetDb, closePool, seedSpaces } from './helpers'
 import { q, q1 } from '@/lib/db'
 import { addMedia, updateMedia, createPromotion, generateWeek, markPromotionPosted, setPromotionStatus, availableTypes, saveOpportunity, buildCaptions, removeMedia, approvedInfoReply } from '@/lib/promo'
-import { processWebhook } from '@/lib/whatsapp'
+import { processWebhook, simulateInbound } from '@/lib/whatsapp'
 
 let S: Awaited<ReturnType<typeof seedSpaces>>, owner: string, staff: string
 const img = (n: number) => Buffer.concat([Buffer.from('RIFF\0\0\0\0WEBPVP8 '), Buffer.from([n, n + 1, n + 2])])
@@ -115,6 +115,29 @@ describe('WhatsApp enquiries from promotions', () => {
     const r = await approvedInfoReply(S.p2)
     expect(r!.body).toContain('Rooftop Party: ₹12,000')
     expect(r!.body).not.toContain('owner_review')
+  })
+})
+
+describe('owner test enquiry (no WhatsApp message is sent)', () => {
+  it('only works for ZZ TEST customers and tags promotion and property', async () => {
+    await expect(simulateInbound('9800022222', 'Real Person', 'hi', owner)).rejects.toThrow(/ZZ TEST/)
+    const code = (await q1<{ code: string }>(`SELECT cp.code FROM crm.promotions pr JOIN crm.campaigns cp ON cp.id = pr.campaign_id WHERE pr.property_id = $1 LIMIT 1`, [S.p2]))!.code
+    await q(`UPDATE crm.business_settings SET auto_reply_enabled = true`)
+    const r = await simulateInbound('9800022222', 'ZZ TEST Buyer', `Hi! I saw your post (${code}).`, owner)
+    expect(r.campaign).toBe(code); expect(r.autoReplied).toBe(false)
+    expect((await q1(`SELECT property_id FROM crm.customers WHERE id = $1`, [r.customerId]))!.property_id).toBe(S.p2)
+    expect((await q1(`SELECT count(*)::int AS n FROM crm.messages WHERE customer_id = $1 AND direction = 'out'`, [r.customerId]))!.n).toBe(0)
+    const again = await simulateInbound('9800022222', 'ZZ TEST Buyer', 'second message', owner)
+    expect(again.customerId).toBe(r.customerId) // matched, no duplicate customer
+  })
+})
+
+describe('old price banners', () => {
+  it('cannot be approved or used', async () => {
+    const m = await addMedia(img(60), { filename: 'room-deluxe-1.webp', mime: 'image/webp', propertyId: S.p2, category: 'rooms', hasTextOverlay: true }, owner)
+    await expect(updateMedia(m.id, { propertyId: S.p2, category: 'rooms', title: 'x', description: null, approved: true }, { id: owner, role: 'owner' })).rejects.toThrow(/old price/)
+    await q(`UPDATE crm.media SET approved = true WHERE id = $1`, [m.id]) // even if forced in the database
+    await expect(createPromotion({ propertyId: S.p2, type: 'rooms', language: 'en', mediaIds: [m.id] }, staff)).rejects.toThrow(/approved for promotion/)
   })
 })
 

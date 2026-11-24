@@ -96,9 +96,9 @@ export async function searchCustomers(term: string, limit = 50) {
 }
 
 export async function getCustomer(id: string) {
-  return q1<Customer & { campaign_name: string | null; campaign_code: string | null }>(
-    `SELECT c.*, cp.name AS campaign_name, cp.code AS campaign_code
-     FROM crm.customers c LEFT JOIN crm.campaigns cp ON cp.id = c.campaign_id WHERE c.id = $1`, [id])
+  return q1<Customer & { campaign_name: string | null; campaign_code: string | null; property_name: string | null }>(
+    `SELECT c.*, cp.name AS campaign_name, cp.code AS campaign_code, p.name AS property_name
+     FROM crm.customers c LEFT JOIN crm.campaigns cp ON cp.id = c.campaign_id LEFT JOIN crm.properties p ON p.id = c.property_id WHERE c.id = $1`, [id])
 }
 
 export async function addFollowUp(customerId: string, dueOn: string, note: string, userId?: string | null, bookingId?: string | null, method?: string | null) {

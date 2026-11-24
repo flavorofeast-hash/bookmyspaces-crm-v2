@@ -2,6 +2,7 @@
 
 import { requireUser, requireOwner } from '@/lib/auth'
 import { run, str } from '@/lib/action'
+import { simulateInbound } from '@/lib/whatsapp'
 import { addMedia, updateMedia, removeMedia, importWebsitePhotos, createPromotion, generateWeek, setPromotionStatus, updateCaptions, recordPromoEvent, markPromotionPosted, saveOpportunity, type PromoType } from '@/lib/promo'
 
 const back = (f: FormData, d: string) => { const b = str(f, 'back'); return b.startsWith('/marketing') ? b : d }
@@ -98,5 +99,13 @@ export async function saveOpportunityAction(f: FormData) {
   await run('/marketing/opportunities', id ? 'Saved.' : 'Added to the list.', async () => {
     await saveOpportunity(id, { platform: str(f, 'platform'), name: str(f, 'name'), url: str(f, 'url'), audience: str(f, 'audience'), category: str(f, 'category'),
       freePosting: str(f, 'free_posting') || 'unknown', membership: str(f, 'membership_required') || 'unknown', rules: str(f, 'rules'), lastChecked: str(f, 'last_checked'), status: str(f, 'status') || 'new', notes: str(f, 'notes') }, u.id)
+  })
+}
+
+export async function simulateInboundAction(f: FormData) {
+  const u = await requireOwner()
+  await run('/settings#connections', 'Test message processed.', async () => {
+    const r = await simulateInbound(str(f, 'phone'), str(f, 'name'), str(f, 'text'), u.id)
+    return `/inbox/${r.customerId}`
   })
 }

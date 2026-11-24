@@ -139,7 +139,7 @@ export async function offerChoices(propertyId: string): Promise<OfferChoice[]> {
 async function pickPhotos(propertyId: string, type: PromoType, n = 8): Promise<string[]> {
   const cats = PROMO_TYPES[type].cats
   const rows = await q<{ id: string }>(
-    `SELECT id FROM crm.media WHERE approved AND archived_at IS NULL AND (property_id = $1 OR property_id IS NULL)
+    `SELECT id FROM crm.media WHERE approved AND archived_at IS NULL AND NOT has_text_overlay AND (property_id = $1 OR property_id IS NULL)
      ORDER BY (category = ANY($2::text[])) DESC, (property_id = $1) DESC, last_used_at NULLS FIRST, created_at LIMIT $3`, [propertyId, cats, n])
   return rows.map((r) => r.id)
 }
@@ -166,7 +166,7 @@ export async function createPromotion(input: { propertyId: string; type: PromoTy
   }
   const media = input.mediaIds?.length ? input.mediaIds : await pickPhotos(prop.id, input.type)
   if (!media.length) throw new Error(`There are no approved photos for ${prop.name} yet. Approve some in Marketing → Gallery first.`)
-  const ok = await q<{ id: string }>(`SELECT id FROM crm.media WHERE id = ANY($1::uuid[]) AND approved AND archived_at IS NULL`, [media])
+  const ok = await q<{ id: string }>(`SELECT id FROM crm.media WHERE id = ANY($1::uuid[]) AND approved AND archived_at IS NULL AND NOT has_text_overlay`, [media])
   if (ok.length !== media.length) throw new Error('Only photos approved for promotion can be used.')
   const prev = await q1<{ n: number }>(`SELECT count(*)::int AS n FROM crm.promotions WHERE property_id = $1 AND promo_type = $2`, [prop.id, input.type])
   const variant = prev?.n ?? 0
@@ -284,10 +284,11 @@ export async function promotionPerformance() {
        count(DISTINCT pr.id)::int AS promotions,
        count(DISTINCT e.id) FILTER (WHERE e.kind IN ('downloaded_image','downloaded_video'))::int AS downloads,
        count(DISTINCT e.id) FILTER (WHERE e.kind = 'posted')::int AS posted,
-       (SELECT count(*)::int FROM crm.customers c WHERE c.campaign_id IN (SELECT campaign_id FROM crm.promotions x WHERE x.property_id = p.id AND x.promo_type = pr.promo_type)) AS enquiries,
-       (SELECT count(*)::int FROM crm.bookings b WHERE b.status IN ('confirmed','completed') AND b.campaign_id IN (SELECT campaign_id FROM crm.promotions x WHERE x.property_id = p.id AND x.promo_type = pr.promo_type)) AS bookings,
-       (SELECT COALESCE(sum(b.total),0) FROM crm.bookings b WHERE b.status IN ('confirmed','completed') AND b.campaign_id IN (SELECT campaign_id FROM crm.promotions x WHERE x.property_id = p.id AND x.promo_type = pr.promo_type)) AS value
+       (SELECT count(*)::int FROM crm.customers c WHERE c.campaign_id IN (SELECT campaign_id FROM crm.promotions x WHERE x.property_id = p.id AND x.promo_type = pr.promo_type AND x.status <> 'archived')) AS enquiries,
+       (SELECT count(*)::int FROM crm.bookings b WHERE b.status IN ('confirmed','completed') AND b.campaign_id IN (SELECT campaign_id FROM crm.promotions x WHERE x.property_id = p.id AND x.promo_type = pr.promo_type AND x.status <> 'archived')) AS bookings,
+       (SELECT COALESCE(sum(b.total),0) FROM crm.bookings b WHERE b.status IN ('confirmed','completed') AND b.campaign_id IN (SELECT campaign_id FROM crm.promotions x WHERE x.property_id = p.id AND x.promo_type = pr.promo_type AND x.status <> 'archived')) AS value
      FROM crm.promotions pr JOIN crm.properties p ON p.id = pr.property_id LEFT JOIN crm.promotion_events e ON e.promotion_id = pr.id
+     WHERE pr.status <> 'archived'
      GROUP BY p.id, p.name, pr.promo_type ORDER BY p.name, pr.promo_type`)
 }
 
@@ -330,6 +331,7 @@ export async function updateMedia(id: string, o: { propertyId: string | null; ca
   let approved = cur.approved
   if (o.approved !== undefined && o.approved !== cur.approved) {
     if (user.role !== 'owner') throw new Error('Only the owner can approve photos for promotion.')
+    if (o.approved && cur.has_text_overlay) throw new Error('This image has an old price printed on it, so it cannot be used in promotions.')
     approved = o.approved
   }
   await q(`UPDATE crm.media SET property_id=$2, category=$3, title=$4, description=$5, approved=$6 WHERE id=$1`, [id, o.propertyId, o.category, o.title, o.description, approved])

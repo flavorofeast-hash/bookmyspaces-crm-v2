@@ -91,7 +91,7 @@ const toMin = (t: string) => { const [h, m] = t.split(':').map(Number); return h
 export type InboundResult = { messageId: string | null; customerId: string; createdCustomer: boolean; duplicate: boolean; campaign: string | null; autoReplied: boolean }
 
 /** Saves one inbound message, finds or creates its customer. Idempotent on Meta's message id. */
-export async function handleInbound(m: WAMessage, profileName: string | null, now = new Date()): Promise<InboundResult> {
+export async function handleInbound(m: WAMessage, profileName: string | null, now = new Date(), opts: { test?: boolean } = {}): Promise<InboundResult> {
   const phone = normalizePhone(m.from.startsWith('+') ? m.from : '+' + m.from)
   if (!phone) throw new Error(`Unusable sender number: ${m.from}`)
   const d = describe(m)
@@ -126,7 +126,7 @@ export async function handleInbound(m: WAMessage, profileName: string | null, no
   })
 
   let autoReplied = false
-  if (!result.duplicate) {
+  if (!result.duplicate && !opts.test) {
     const s = await q1<{ auto_reply_enabled: boolean; auto_reply_text: string; business_hours_start: string; business_hours_end: string }>(
       `SELECT auto_reply_enabled, auto_reply_text, business_hours_start::text, business_hours_end::text FROM crm.business_settings WHERE id = 1`)
     if (s?.auto_reply_enabled && waStatus().canSend) {
@@ -274,4 +274,18 @@ export async function thread(customerId: string) {
 
 export async function markRead(customerId: string) {
   await q(`UPDATE crm.messages SET read_by_staff = true WHERE customer_id = $1 AND direction = 'in' AND NOT read_by_staff`, [customerId])
+}
+
+/**
+ * Owner-only end-to-end check before WhatsApp moves to this CRM: runs a typed message through the same code path
+ * as a real incoming message. Nothing is sent to anyone, and only customers named "ZZ TEST…" can be used.
+ */
+export async function simulateInbound(phone: string, name: string, text: string, userId: string): Promise<InboundResult> {
+  if (!/^ZZ TEST/i.test(name.trim())) throw new Error('Test messages are only allowed for customers named “ZZ TEST …”, so real records are never touched.')
+  const p = normalizePhone(phone)
+  if (!p) throw new Error('Enter a valid 10-digit mobile number.')
+  if (!text.trim()) throw new Error('Type the message.')
+  const r = await handleInbound({ id: `test.${Date.now()}.${Math.random().toString(36).slice(2, 8)}`, from: p, timestamp: String(Math.floor(Date.now() / 1000)), type: 'text', text: { body: text.trim() } } as WAMessage, name.trim(), new Date(), { test: true })
+  await logActivity({ userId, customerId: r.customerId, action: 'whatsapp_test_in', detail: `Test message (not from WhatsApp)${r.campaign ? `, promotion ${r.campaign}` : ''}` })
+  return r
 }

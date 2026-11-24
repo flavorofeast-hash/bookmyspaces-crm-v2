@@ -4,6 +4,7 @@ import { q, q1 } from '@/lib/db'
 import { getSettings } from '@/lib/setup'
 import { waStatus } from '@/lib/whatsapp'
 import * as A from './actions'
+import { simulateInboundAction } from '../marketing/studio-actions'
 import { PageHeader, Card, Flash, Field, Hidden, Badge, Reveal, Empty } from '@/components/ui'
 import { SubmitButton } from '@/components/client'
 import { inr, fmtDateTime } from '@/lib/format'
@@ -256,6 +257,16 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
               <div key={label as string} className="flex items-start gap-2"><Badge value={ok ? 'confirmed' : 'tentative'} label={ok ? 'Set' : 'Not set'} /><span><b>{label as string}</b>{!ok && <span className="muted"> — {need as string}</span>}</span></div>
             ))}
             <p className="text-xs muted">Secret values are entered in Vercel (Project → Settings → Environment Variables), never in this screen.</p>
+          </div>
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <div className="font-medium text-sm">Test an incoming WhatsApp enquiry</div>
+            <p className="text-xs muted mb-2">Runs a typed message through the same steps as a real WhatsApp message (customer match, promotion code, property). Nothing is sent. Only for customers named “ZZ TEST …”.</p>
+            <form action={simulateInboundAction} className="grid sm:grid-cols-3 gap-2 items-end">
+              <Field label="Customer name"><input name="name" defaultValue="ZZ TEST " className="input" required /></Field>
+              <Field label="Mobile"><input name="phone" className="input" required /></Field>
+              <Field label="Message" className="sm:col-span-3"><input name="text" className="input" placeholder="Hi! I saw your post (CODE). Please share details." required /></Field>
+              <SubmitButton className="btn-secondary">Run test message</SubmitButton>
+            </form>
           </div>
         </Card>
 

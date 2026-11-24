@@ -33,7 +33,7 @@ export default async function CustomerPage(props: { params: Promise<{ id: string
     <>
       <PageHeader
         title={c.name}
-        subtitle={<>{formatPhone(c.phone) || 'No mobile number'} · {SOURCE_LABEL[c.source] ?? c.source}{c.campaign_code ? ` · Campaign ${c.campaign_code}` : ''} · Customer since {fmtDate(c.created_at)}</>}
+        subtitle={<>{formatPhone(c.phone) || 'No mobile number'} · {SOURCE_LABEL[c.source] ?? c.source}{c.campaign_code ? ` · Campaign ${c.campaign_code}` : ''}{c.property_name ? ` · Enquiry about ${c.property_name}` : ''} · Customer since {fmtDate(c.created_at)}</>}
         actions={<>
           <Link href={`/bookings/new?customer=${c.id}`} className="btn-primary">+ New booking / enquiry</Link>
           {(c.whatsapp || c.phone) && <Link href={`/inbox/${c.id}`} className="btn-secondary">WhatsApp chat</Link>}
