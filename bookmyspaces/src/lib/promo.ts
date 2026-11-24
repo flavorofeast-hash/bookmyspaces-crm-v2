@@ -216,7 +216,7 @@ export async function getPromotion(id: string) {
      FROM crm.promotions pr JOIN crm.properties p ON p.id = pr.property_id LEFT JOIN crm.campaigns cp ON cp.id = pr.campaign_id
      LEFT JOIN crm.app_users u ON u.id = pr.created_by LEFT JOIN crm.app_users a ON a.id = pr.approved_by WHERE pr.id = $1`, [id])
   if (!p) return null
-  const media = await q<any>(`SELECT id, public_token, title FROM crm.media WHERE id = ANY($1::uuid[])`, [p.media_ids])
+  const media = await q<any>(`SELECT id, public_token, title, ai_mark FROM crm.media WHERE id = ANY($1::uuid[])`, [p.media_ids])
   const order = new Map<string, number>((p.media_ids as string[]).map((m, i) => [m, i]))
   media.sort((a, b) => order.get(a.id)! - order.get(b.id)!)
   const events = await q<any>(`SELECT e.*, u.name AS user_name, o.name AS opportunity_name FROM crm.promotion_events e LEFT JOIN crm.app_users u ON u.id = e.user_id
@@ -295,7 +295,7 @@ export async function promotionPerformance() {
 
 const MIME: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 
-export async function addMedia(bytes: Buffer, o: { filename: string; mime: string; propertyId?: string | null; category?: string | null; title?: string | null; description?: string | null; sourceUrl?: string | null; hasTextOverlay?: boolean }, userId?: string | null): Promise<{ id: string; duplicate: boolean }> {
+export async function addMedia(bytes: Buffer, o: { filename: string; mime: string; propertyId?: string | null; category?: string | null; title?: string | null; description?: string | null; sourceUrl?: string | null; hasTextOverlay?: boolean; aiMark?: boolean }, userId?: string | null): Promise<{ id: string; duplicate: boolean }> {
   if (!MIME[o.mime]) throw new Error('Upload a JPG, PNG or WebP image.')
   if (bytes.length > 5 * 1024 * 1024) throw new Error('Each image must be 5 MB or smaller.')
   if (o.category && !(MEDIA_CATEGORIES as readonly string[]).includes(o.category)) throw new Error('Choose a valid category.')
@@ -303,10 +303,10 @@ export async function addMedia(bytes: Buffer, o: { filename: string; mime: strin
   const dup = await q1<{ id: string }>(`SELECT id FROM crm.media WHERE sha256 = $1`, [sha])
   if (dup) return { id: dup.id, duplicate: true }
   const r = await q1<{ id: string }>(
-    `INSERT INTO crm.media (filename, mime, bytes, size, public_token, property_id, category, title, description, source_url, sha256, uploaded_by, has_text_overlay)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) ON CONFLICT (sha256) WHERE sha256 IS NOT NULL DO NOTHING RETURNING id`,
+    `INSERT INTO crm.media (filename, mime, bytes, size, public_token, property_id, category, title, description, source_url, sha256, uploaded_by, has_text_overlay, ai_mark)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (sha256) WHERE sha256 IS NOT NULL DO NOTHING RETURNING id`,
     [o.filename.slice(0, 200), o.mime, bytes, bytes.length, randomBytes(18).toString('base64url'), o.propertyId || null, o.category || null,
-      o.title?.slice(0, 120) || null, o.description?.slice(0, 500) || null, o.sourceUrl || null, sha, userId ?? null, !!o.hasTextOverlay])
+      o.title?.slice(0, 120) || null, o.description?.slice(0, 500) || null, o.sourceUrl || null, sha, userId ?? null, !!o.hasTextOverlay, !!o.aiMark])
   if (!r) return { id: (await q1<{ id: string }>(`SELECT id FROM crm.media WHERE sha256 = $1`, [sha]))!.id, duplicate: true }
   await logActivity({ userId, action: 'media_added', detail: o.title || o.filename })
   return { id: r.id, duplicate: false }
@@ -319,7 +319,7 @@ export async function listMedia(f: { propertyId?: string; category?: string; app
   if (f.category) { args.push(f.category); where.push(`m.category = $${args.length}`) }
   if (f.approved === 'yes') where.push('m.approved'); if (f.approved === 'no') where.push('NOT m.approved')
   if (f.search) { args.push(`%${f.search}%`); where.push(`(m.title ILIKE $${args.length} OR m.description ILIKE $${args.length} OR m.filename ILIKE $${args.length})`) }
-  return q<any>(`SELECT m.id, m.filename, m.mime, m.size, m.public_token, m.property_id, m.category, m.title, m.description, m.approved, m.has_text_overlay, m.source_url, m.created_at, m.last_used_at, p.name AS property_name
+  return q<any>(`SELECT m.id, m.filename, m.mime, m.size, m.public_token, m.property_id, m.category, m.title, m.description, m.approved, m.has_text_overlay, m.ai_mark, m.source_url, m.created_at, m.last_used_at, p.name AS property_name
     FROM crm.media m LEFT JOIN crm.properties p ON p.id = m.property_id WHERE ${where.join(' AND ')} ORDER BY p.name NULLS LAST, m.category, m.created_at`, args)
 }
 
@@ -350,6 +350,7 @@ export async function removeMedia(id: string, userId: string): Promise<'deleted'
 // Photos found on the old public website (www.bookmyspaces.in/images). Descriptions record what each shows,
 // based on the website's own alt text and a visual check. Nothing is approved automatically.
 const SITE = 'https://www.bookmyspaces.in/images/'
+const AI_MARKED = new Set(['cafe-main.webp', 'cafe-rooftop.webp', 'gallery-1.webp', 'gallery-2.webp', 'gallery-4.webp', 'room-decor.webp', 'rooftop-dining.webp', 'hall-event.webp', 'rooftop-evening.webp', 'room-deluxe-1.webp', 'room-deluxe-2.webp', 'room-deluxe-3.webp', 'skyline-serenity.webp', 'hero-main.webp'])
 const SITE_PHOTOS: { f: string; prop: string | null; cat: string; title: string; note?: string; overlay?: boolean }[] = [
   { f: 'monurama-exterior.webp', prop: 'MonuRama Homestay', cat: 'exterior', title: 'MonuRama building front' },
   { f: 'rooftop-evening.webp', prop: 'MonuRama Homestay', cat: 'rooftop', title: 'Rooftop terrace with evening lights' },
@@ -383,7 +384,7 @@ export async function importWebsitePhotos(userId: string): Promise<{ added: numb
       const type = res.headers.get('content-type')?.split(';')[0] ?? ''
       if (!res.ok || !MIME[type]) { failed.push(`${s.f} (${res.status})`); continue }
       const r = await addMedia(Buffer.from(await res.arrayBuffer()), { filename: s.f, mime: type, propertyId: s.prop ? props.get(s.prop) ?? null : null, category: s.cat, title: s.title,
-        description: ['Recovered from www.bookmyspaces.in.', s.note].filter(Boolean).join(' '), sourceUrl: SITE + s.f, hasTextOverlay: s.overlay }, userId)
+        description: ['Recovered from www.bookmyspaces.in.', s.note, AI_MARKED.has(s.f) ? 'Shows the Google Gemini AI sparkle mark (bottom-right): this image was made or edited with AI. Approve only if it truly shows the property as it is.' : null].filter(Boolean).join(' '), sourceUrl: SITE + s.f, hasTextOverlay: s.overlay, aiMark: AI_MARKED.has(s.f) }, userId)
       if (r.duplicate) duplicates++; else added++
     } catch (e) { failed.push(`${s.f} (${(e as Error).message})`) }
   }

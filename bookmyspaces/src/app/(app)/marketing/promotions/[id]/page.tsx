@@ -31,6 +31,7 @@ export default async function PromotionPage(props: { params: Promise<{ id: strin
       <PageHeader title={p.headline} subtitle={<><Link href="/marketing/studio" className="link">← Promotion Studio</Link> · {p.property_name} · {PROMO_TYPES[p.promo_type as PromoType]?.label} · code <span className="font-mono">{c.code}</span>{p.planned_for ? ` · planned ${fmtDate(p.planned_for)}` : ''}</>}
         actions={<Badge value={p.status === 'approved' ? 'confirmed' : p.status === 'posted' ? 'published' : 'draft'} label={p.status === 'draft' ? 'Waiting for owner approval' : p.status} />} />
       <Flash ok={sp.ok} err={sp.err} />
+      {p.media.some((m: any) => m.ai_mark) && <div className="mb-4 rounded-lg px-4 py-3 text-sm border bg-red-50 border-red-200 text-red-800">Some photos in this promotion carry an AI mark (made or edited with AI). Post only if they truly show the property as it is — otherwise choose other photos.</div>}
       {!p.promo_contacts_confirmed && <div className="mb-4 rounded-lg px-4 py-3 text-sm border bg-amber-50 border-amber-200 text-amber-900">Check the phone numbers on the image before posting: the owner has not yet confirmed them in Settings → Properties.</div>}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2 space-y-4">

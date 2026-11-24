@@ -26,6 +26,11 @@ describe('photo gallery', () => {
     await updateMedia(a.id, { propertyId: S.p2, category: 'rooftop', title: 'Rooftop', description: null, approved: true }, { id: owner, role: 'owner' })
     expect((await q1(`SELECT approved FROM crm.media WHERE id = $1`, [a.id]))!.approved).toBe(true)
   })
+
+  it('records an AI mark on imported images so they are never passed off as untouched photos', async () => {
+    const m = await addMedia(img(40), { filename: 'gallery-4.webp', mime: 'image/webp', aiMark: true }, owner)
+    expect((await q1(`SELECT ai_mark, approved FROM crm.media WHERE id = $1`, [m.id]))).toEqual({ ai_mark: true, approved: false })
+  })
 })
 
 describe('promotions', () => {

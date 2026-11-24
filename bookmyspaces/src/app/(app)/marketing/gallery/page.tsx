@@ -42,6 +42,7 @@ export default async function GalleryPage(props: { searchParams: Promise<SP> }) 
                   <div className="flex flex-wrap gap-1 items-center">
                     {m.approved ? <Badge value="confirmed" label="Approved for promotion" /> : <Badge value="tentative" label="Not approved" />}
                     {m.has_text_overlay && <Badge value="cancelled" label="Has text/price printed" />}
+                    {m.ai_mark && <Badge value="cancelled" label="AI mark — made or edited with AI" />}
                     <span className="text-xs muted">{Math.round(m.size / 1024)} KB · {m.mime.replace('image/', '')}</span>
                   </div>
                   {m.description && <p className="text-xs muted">{m.description}</p>}
