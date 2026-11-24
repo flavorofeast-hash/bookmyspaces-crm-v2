@@ -108,4 +108,26 @@ describe('flexible pricing', () => {
     await expect(createBooking({ customerId: c1, bookingType: 'event', event: e, start: e.start, end: e.end })).rejects.toThrow(/not configured/)
     expect((await q<any>(`SELECT * FROM crm.price_audit WHERE space_id = $1 AND rate_type = 'unit'`, [S.mroom]))[0]).toMatchObject({ old_value: 'night', new_value: null })
   })
+
+  it('per-day spaces (studio) are charged by the number of days, each day at its own rate', async () => {
+    await updateSpace(spaceForm(S.mroom, 'Studio', 'other', { price: '2000', min_price: '1400', max_price: '5000', price_unit: 'day' }), owner)
+    const audit = await q<any>(`SELECT old_value, new_value FROM crm.price_audit WHERE space_id = $1 AND rate_type = 'unit' ORDER BY id`, [S.mroom])
+    expect(audit[audit.length - 1]).toMatchObject({ old_value: null, new_value: 'day' })
+    await setRate(staff, S.mroom, 'weekday', 3000, { weekday: 6 }) // Saturdays
+    const one = { spaceIds: [S.mroom], start: ist('2027-06-02', '09:00'), end: ist('2027-06-02', '18:00'), hours: 9 } // Wednesday, 1 day
+    const b1 = await createBooking({ customerId: c1, bookingType: 'event', event: one, start: one.start, end: one.end })
+    expect((await getBooking(b1.id)).items.map((i: any) => [Number(i.qty), Number(i.unit_price)])).toEqual([[1, 2000]])
+    const three = { spaceIds: [S.mroom], start: ist('2027-06-04', '09:00'), end: ist('2027-06-06', '18:00'), hours: 57 } // Fri, Sat, Sun = 3 days
+    const b3 = await createBooking({ customerId: c1, bookingType: 'event', event: three, start: three.start, end: three.end, confirm: true })
+    const full = await getBooking(b3.id)
+    expect(full.items.map((i: any) => [Number(i.qty), Number(i.unit_price)])).toEqual([[1, 2000], [1, 3000], [1, 2000]])
+    expect(Number(full.total)).toBe(7000)
+    // the split lines keep the studio held for the whole period
+    const mid = { spaceIds: [S.mroom], start: ist('2027-06-05', '00:00'), end: ist('2027-06-05', '01:00'), hours: 1 }
+    await expect(createBooking({ customerId: c1, bookingType: 'event', event: mid, start: mid.start, end: mid.end, confirm: true })).rejects.toThrow(/Double booking/)
+    // a manually added per-day line gets its quantity from the dates (2 days), not from the typed quantity
+    await addBookingItem(b1.id, { lineType: 'space', spaceId: S.mroom, description: 'Studio extra', qty: 1, unitPrice: 2000, start: ist('2027-06-09', '09:00'), end: ist('2027-06-10', '18:00') })
+    const extra = (await getBooking(b1.id)).items.find((i: any) => i.description === 'Studio extra')
+    expect(Number(extra.qty)).toBe(2)
+  })
 })

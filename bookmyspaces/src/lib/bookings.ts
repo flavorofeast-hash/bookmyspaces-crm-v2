@@ -68,6 +68,14 @@ export type NewBookingInput = {
   campaignId?: string | null
 }
 
+/** IST calendar dates a [start, end) range touches: 10 Jan 08:00 → 11 Jan 20:00 = 10 and 11 Jan. */
+export function daysTouched(start: Date, end: Date): string[] {
+  const a = istDate(start), b = istDate(new Date(Math.max(start.getTime(), end.getTime() - 1)))
+  const out: string[] = []
+  for (let d = a; d <= b; d = addDays(d, 1)) out.push(d)
+  return out
+}
+
 function qtyFor(space: Space, ctx: { nights: number; hours: number; guests: number }): number {
   switch (space.price_unit) {
     case 'night': return Math.max(1, ctx.nights)
@@ -102,7 +110,8 @@ async function addSpaceLines(db: Db, bookingId: string, spaceIds: string[], star
   const spaces = await q<Space>(`SELECT s.*, p.name AS property_name FROM crm.spaces s JOIN crm.properties p ON p.id = s.property_id WHERE s.id = ANY($1::uuid[])`, [spaceIds], db)
   const nights = Math.max(1, ctx.nights), first = istDate(start)
   const dates = Array.from({ length: nights }, (_, k) => addDays(first, k))
-  const rate = await ratesFor(db, spaces, dates)
+  const days = daysTouched(start, end)
+  const rate = await ratesFor(db, spaces, Array.from(new Set([...dates, ...days])))
   let i = 0
   const insert = (s: Space, desc: string, a: Date, b: Date, qty: number, price: number) => q(
     `INSERT INTO crm.booking_items (booking_id, line_type, space_id, description, start_at, end_at, qty, unit_price, sort_order)
@@ -118,6 +127,17 @@ async function addSpaceLines(db: Db, bookingId: string, spaceIds: string[], star
         const a = r === 0 ? start : new Date(start.getTime() + run.from * 864e5)
         const b = r === runs.length - 1 ? end : new Date(start.getTime() + (run.from + run.n) * 864e5)
         await insert(s, `${name} (${run.n} night${run.n === 1 ? '' : 's'}${runs.length > 1 ? ` from ${dates[run.from]}` : ''})`, a, b, run.n, run.price)
+      }
+      continue
+    }
+    if (s.price_unit === 'day') {
+      // Charged per calendar day touched, each day at its own rate (date-specific / weekday / standard); lines join at midnight.
+      const runs: { from: number; n: number; price: number }[] = []
+      days.forEach((d, k) => { const p = rate(s, d)!; const last = runs[runs.length - 1]; if (last && last.price === p) last.n++; else runs.push({ from: k, n: 1, price: p }) })
+      for (const [r, run] of runs.entries()) {
+        const a = r === 0 ? start : istToDate(days[run.from], '00:00')
+        const b = r === runs.length - 1 ? end : istToDate(days[run.from + run.n], '00:00')
+        await insert(s, `${name} (${run.n} day${run.n === 1 ? '' : 's'}${runs.length > 1 ? ` from ${days[run.from]}` : ''})`, a, b, run.n, run.price)
       }
       continue
     }
@@ -218,6 +238,7 @@ export async function addBookingItem(bookingId: string, item: { lineType: 'space
       const sp = await q1<{ name: string; price_unit: string | null; min_price: string | null; max_price: string | null }>(`SELECT name, price_unit, min_price, max_price FROM crm.spaces WHERE id = $1`, [item.spaceId], db)
       if (!sp) throw new Error('Room or space not found.')
       if (sp.price_unit === null) throw new Error(`${sp.name} has no confirmed pricing unit yet, so it cannot be booked.`)
+      if (sp.price_unit === 'day' && item.start && item.end) item = { ...item, qty: daysTouched(item.start, item.end).length }
       if ((sp.min_price !== null && item.unitPrice < Number(sp.min_price)) || (sp.max_price !== null && item.unitPrice > Number(sp.max_price)))
         throw new Error(`₹${item.unitPrice} is outside the allowed range for ${sp.name} (₹${Number(sp.min_price ?? 0)} – ₹${Number(sp.max_price ?? 0)}).`)
     }
