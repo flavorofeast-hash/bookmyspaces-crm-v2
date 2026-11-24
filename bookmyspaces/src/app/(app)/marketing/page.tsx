@@ -2,6 +2,7 @@ import { requireUser } from '@/lib/auth'
 import Link from 'next/link'
 import { q1 } from '@/lib/db'
 import { campaignStats, listPosts, trackingLink } from '@/lib/marketing'
+import { promotionPerformance, PROMO_TYPES, type PromoType } from '@/lib/promo'
 import { createCampaignAction } from './actions'
 import { PageHeader, Card, Flash, Empty, Field, Badge, Reveal } from '@/components/ui'
 import { SubmitButton, CopyButton } from '@/components/client'
@@ -12,12 +13,19 @@ const PL: Record<string, string> = { facebook: 'Facebook', instagram: 'Instagram
 export default async function MarketingPage(props: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const searchParams = await props.searchParams
-  const [campaigns, posts, s] = await Promise.all([campaignStats(), listPosts(), q1<any>(`SELECT whatsapp_number, business_name FROM crm.business_settings WHERE id = 1`)])
+  const [campaigns, posts, s, perf] = await Promise.all([campaignStats(), listPosts(), q1<any>(`SELECT whatsapp_number, business_name FROM crm.business_settings WHERE id = 1`), promotionPerformance()])
   const byMonth = posts.reduce<Record<string, any[]>>((a, p) => { const k = p.planned_for ? fmtDate(p.planned_for).replace(/^\d+ /, '') : 'Not scheduled'; (a[k] ??= []).push(p); return a }, {})
   return (
     <>
-      <PageHeader title="Marketing" subtitle="Plan posts, publish to Facebook & Instagram, track which campaigns bring enquiries" actions={<Link href="/marketing/posts/new" className="btn-primary">+ New post</Link>} />
+      <PageHeader title="Marketing" subtitle="Plan posts, publish to Facebook & Instagram, track which campaigns bring enquiries" actions={<><Link href="/marketing/studio" className="btn-primary">Promotion Studio</Link><Link href="/marketing/gallery" className="btn-secondary">Photo gallery</Link><Link href="/marketing/opportunities" className="btn-secondary">Free places to post</Link><Link href="/marketing/posts/new" className="btn-secondary">+ New post</Link></>} />
       <Flash ok={searchParams.ok} err={searchParams.err} />
+      <Card title="Which promotions bring business" className="mb-4" pad={false}>
+        {perf.length === 0 ? <div className="card-pad"><Empty>No promotions yet. Start in the <Link href="/marketing/studio" className="link">Promotion Studio</Link>.</Empty></div> : (
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-left text-xs muted"><th className="px-4 py-2">Property</th><th className="px-2">Type</th><th className="px-2 text-right">Promotions</th><th className="px-2 text-right">Downloads</th><th className="px-2 text-right">Posted</th><th className="px-2 text-right">Enquiries</th><th className="px-2 text-right">Bookings</th><th className="px-4 text-right">Booked value</th></tr></thead>
+            <tbody className="divide-y divide-slate-100">{perf.map((r) => (
+              <tr key={r.property + r.promo_type}><td className="px-4 py-2">{r.property}</td><td className="px-2">{PROMO_TYPES[r.promo_type as PromoType]?.label ?? r.promo_type}</td><td className="px-2 text-right">{r.promotions}</td><td className="px-2 text-right">{r.downloads}</td><td className="px-2 text-right">{r.posted}</td><td className="px-2 text-right">{r.enquiries}</td><td className="px-2 text-right">{r.bookings}</td><td className="px-4 text-right">{inr(r.value)}</td></tr>))}</tbody></table>
+            <p className="text-xs muted px-4 py-2">Enquiries and bookings are counted from customers who used a promotion&apos;s code or WhatsApp link, or were tagged by staff. Reach, views and likes are not shown — that data is not available here.</p></div>)}
+      </Card>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-2">
           <Card title="Content calendar" pad={false}>

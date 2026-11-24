@@ -31,6 +31,12 @@ export async function saveProperty(f: FormData) {
         food_packages_enabled=$8, booking_rules=$9 WHERE id=$1`,
       [id, name, s(f.get('address')), s(f.get('phone')), s(f.get('notes')), f.get('active') !== 'off', n(f.get('sort_order')),
         f.get('food_packages_enabled') === 'on', s(f.get('booking_rules'))])
+    if (id && f.has('promo_phones')) {
+      const wa = s(f.get('promo_whatsapp'))?.replace(/\D/g, '') ?? null
+      if (wa && !/^(91)?\d{10}$/.test(wa)) throw new Error('Promotion WhatsApp number must be a 10-digit mobile number.')
+      await q(`UPDATE crm.properties SET promo_phones=$2, promo_whatsapp=$3, promo_location=$4, promo_highlights=$5, promo_contacts_confirmed=$6 WHERE id=$1`,
+        [id, s(f.get('promo_phones')), wa ? wa.slice(-10) : null, s(f.get('promo_location')), s(f.get('promo_highlights')), f.get('promo_contacts_confirmed') === 'on'])
+    }
     else await q(`INSERT INTO crm.properties (name, address, phone, notes, sort_order) VALUES ($1,$2,$3,$4,COALESCE($5,0))`,
       [name, s(f.get('address')), s(f.get('phone')), s(f.get('notes')), n(f.get('sort_order'))])
   } catch (e) {

@@ -86,6 +86,11 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
                 <SubmitButton className="btn-secondary">Save</SubmitButton>
                 <Field label="Booking rules" className="sm:col-span-4"><input name="booking_rules" defaultValue={p.booking_rules ?? ''} placeholder="e.g. check-in 2 pm, no outside food, music until 10 pm" className="input" /></Field>
                 <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="food_packages_enabled" defaultChecked={p.food_packages_enabled} /> Food packages</label>
+                <Field label="Phone numbers on promotions" className="sm:col-span-2"><input name="promo_phones" defaultValue={p.promo_phones ?? ''} placeholder="9051459463 / 7003853624" className="input" /></Field>
+                <Field label="WhatsApp on promotions"><input name="promo_whatsapp" defaultValue={p.promo_whatsapp ?? ''} placeholder="8017035546" className="input" /></Field>
+                <Field label="Location on promotions" className="sm:col-span-2"><input name="promo_location" defaultValue={p.promo_location ?? ''} className="input" /></Field>
+                <Field label="Highlights on promotions (only real facilities)" className="sm:col-span-3"><input name="promo_highlights" defaultValue={p.promo_highlights ?? ''} className="input" /></Field>
+                <label className="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" name="promo_contacts_confirmed" defaultChecked={p.promo_contacts_confirmed} /> I confirm these contact details are correct</label>
               </form>
             ))}
             <form action={A.savePropertyAction} className="grid sm:grid-cols-5 gap-2 items-end">

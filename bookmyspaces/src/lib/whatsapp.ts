@@ -69,6 +69,19 @@ async function findCampaignCode(text: string | null, db: Db): Promise<{ id: stri
   return q1<{ id: string; code: string }>(`SELECT id, code FROM crm.campaigns WHERE code = ANY($1::text[]) ORDER BY created_at DESC LIMIT 1`, [tokens], db)
 }
 
+/** The property an enquiry is about: the promotion behind its code, otherwise a property named in the message. */
+async function detectProperty(text: string | null, campaignId: string | null, db: Db): Promise<string | null> {
+  if (campaignId) {
+    const p = await q1<{ property_id: string }>(`SELECT property_id FROM crm.promotions WHERE campaign_id = $1 LIMIT 1`, [campaignId], db)
+    if (p) return p.property_id
+  }
+  if (!text) return null
+  const props = await q<{ id: string; name: string }>(`SELECT id, name FROM crm.properties WHERE active`, [], db)
+  const t = text.toLowerCase()
+  const hits = props.filter((p) => t.includes(p.name.toLowerCase().split(/\s+/)[0]))
+  return hits.length === 1 ? hits[0].id : null
+}
+
 function istMinutes(d: Date): number {
   const [h, m] = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false }).format(d).split(':').map(Number)
   return h * 60 + m
@@ -100,6 +113,8 @@ export async function handleInbound(m: WAMessage, profileName: string | null, no
     } else if (campaign && !c.campaign_id) {
       await q(`UPDATE crm.customers SET campaign_id = $2, updated_at = now() WHERE id = $1`, [c.id, campaign.id], db)
     }
+    const propertyId = await detectProperty(d.body, campaign?.id ?? null, db)
+    if (propertyId) await q(`UPDATE crm.customers SET property_id = $2 WHERE id = $1 AND property_id IS NULL`, [c!.id, propertyId], db)
     const prior = await q1<{ n: number }>(`SELECT count(*)::int AS n FROM crm.messages WHERE customer_id = $1 AND direction = 'in'`, [c!.id], db)
     const ins = await q1<{ id: string }>(
       `INSERT INTO crm.messages (customer_id, direction, msg_type, body, media_id, wa_message_id, status, created_at)

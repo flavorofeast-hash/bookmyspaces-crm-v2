@@ -7,6 +7,7 @@ import { sendReplyAction, sendTemplateAction } from '../actions'
 import { WaBanner } from '@/components/wa-banner'
 import { PageHeader, Card, Flash, Badge, Hidden, Empty } from '@/components/ui'
 import { SubmitButton, QuickReplyBox } from '@/components/client'
+import { approvedInfoReply } from '@/lib/promo'
 import { fmtDateTime } from '@/lib/format'
 import { formatPhone, waLink } from '@/lib/phone'
 
@@ -16,18 +17,21 @@ export default async function ThreadPage(props: { params: Promise<{ customerId: 
   await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const params = await props.params
   const searchParams = await props.searchParams
-  const c = await q1<any>(`SELECT id, name, phone, whatsapp FROM crm.customers WHERE id = $1`, [params.customerId]).catch(() => null)
+  const c = await q1<any>(`SELECT c.id, c.name, c.phone, c.whatsapp, c.property_id, p.name AS property_name, cp.code AS campaign_code FROM crm.customers c LEFT JOIN crm.properties p ON p.id = c.property_id LEFT JOIN crm.campaigns cp ON cp.id = c.campaign_id WHERE c.id = $1`, [params.customerId]).catch(() => null)
   if (!c) notFound()
-  const [msgs, replies, templates, win, booking] = await Promise.all([
+  const [msgs, savedReplies, templates, win, booking, propIds] = await Promise.all([
     thread(c.id), q<any>(`SELECT * FROM crm.quick_replies ORDER BY sort_order`), q<any>(`SELECT * FROM crm.wa_templates ORDER BY name`), windowOpen(c.id),
     q1<any>(`SELECT id, ref, status FROM crm.bookings WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 1`, [c.id]),
+    c.property_id ? Promise.resolve([{ id: c.property_id }]) : q<{ id: string }>(`SELECT id FROM crm.properties WHERE active ORDER BY sort_order, name`),
   ])
+  // Replies built from approved catalogue items and set rates (staff choose and send; nothing is sent automatically).
+  const replies = [...(await Promise.all(propIds.map((p) => approvedInfoReply(p.id)))).filter((r): r is NonNullable<typeof r> => !!r), ...savedReplies]
   await markRead(c.id)
   const s = waStatus()
   const number = c.whatsapp ?? c.phone
   return (
     <>
-      <PageHeader title={c.name} subtitle={formatPhone(number) || 'No WhatsApp number'}
+      <PageHeader title={c.name} subtitle={<>{formatPhone(number) || 'No WhatsApp number'}{c.property_name ? ` · Enquiry about ${c.property_name}` : ''}{c.campaign_code ? ` · from promotion ${c.campaign_code}` : ''}</>}
         actions={<>
           <Link href={`/customers/${c.id}`} className="btn-secondary btn-sm">Customer record</Link>
           <Link href={`/bookings/new?customer=${c.id}`} className="btn-primary btn-sm">Convert to booking</Link>
