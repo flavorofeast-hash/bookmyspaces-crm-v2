@@ -1,6 +1,7 @@
 import { q, q1, tx, isPgError, type Db } from './db'
 import { logActivity } from './activity'
 import { createCustomer, findCustomerByPhone } from './customers'
+import { istDate, istToDate, addDays } from './format'
 
 export type Space = {
   id: string; property_id: string; property_name: string; name: string; kind: 'room' | 'hall' | 'rooftop' | 'other'
@@ -280,4 +281,24 @@ export async function calendarItems(from: Date, to: Date) {
      FROM crm.booking_items i JOIN crm.bookings b ON b.id = i.booking_id JOIN crm.customers c ON c.id = b.customer_id
      WHERE i.space_id IS NOT NULL AND b.status <> 'cancelled' AND tstzrange(i.start_at, i.end_at, '[)') && tstzrange($1, $2, '[)')
      ORDER BY i.start_at`, [from, to])
+}
+
+export type CalendarEntry = { item_id: string; space_id: string; space: string; kind: string; property_id: string | null; property: string | null; booking_id: string; ref: string; status: string; holds: boolean; customer: string; phone: string | null; assigned: string | null; start_at: string; end_at: string }
+/** Dashboard calendar: space lines overlapping [from, to), optional property/space filter. Read-only view; availability is still decided by the database. */
+export async function dashboardCalendar(from: Date, to: Date, propertyId?: string | null, spaceId?: string | null) {
+  return q<CalendarEntry>(
+    `SELECT i.id AS item_id, i.space_id, s.name AS space, s.kind, p.id AS property_id, p.name AS property, b.id AS booking_id, b.ref, b.status, i.holds,
+       c.name AS customer, COALESCE(c.phone, c.whatsapp) AS phone, au.name AS assigned, i.start_at, i.end_at
+     FROM crm.booking_items i JOIN crm.spaces s ON s.id = i.space_id LEFT JOIN crm.properties p ON p.id = s.property_id
+     JOIN crm.bookings b ON b.id = i.booking_id JOIN crm.customers c ON c.id = b.customer_id LEFT JOIN crm.app_users au ON au.id = b.assigned_to
+     WHERE b.status <> 'cancelled' AND tstzrange(i.start_at, i.end_at, '[)') && tstzrange($1, $2, '[)')
+       AND ($3::uuid IS NULL OR s.property_id = $3) AND ($4::uuid IS NULL OR s.id = $4)
+     ORDER BY i.start_at, s.sort_order, s.name`, [from, to, propertyId || null, spaceId || null])
+}
+
+/** Dates a calendar entry occupies: rooms from check-in date up to (not including) check-out date; halls/rooftop every date the time range touches. */
+export function occupiesDate(e: { kind: string; start_at: string | Date; end_at: string | Date }, d: string): boolean {
+  const s = istDate(new Date(e.start_at)), en = istDate(new Date(e.end_at))
+  if (e.kind === 'room') return s === en ? d === s : d >= s && d < en
+  return new Date(e.start_at) < istToDate(addDays(d, 1), '00:00') && new Date(e.end_at) > istToDate(d, '00:00')
 }

@@ -6,8 +6,9 @@ import { PageHeader, Card, Flash, Empty, Stat, Hidden, Badge } from '@/component
 import { SubmitButton } from '@/components/client'
 import { inr, fmtDate, fmtTime, fmtDay, fmtDateTime, SOURCE_LABEL, STATUS_LABEL } from '@/lib/format'
 import { formatPhone } from '@/lib/phone'
+import { BookingCalendar, type CalParams } from '@/components/booking-calendar'
 
-export default async function TodayPage(props: { searchParams: Promise<{ ok?: string; err?: string }> }) {
+export default async function TodayPage(props: { searchParams: Promise<{ ok?: string; err?: string } & CalParams> }) {
   await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const searchParams = await props.searchParams
   const d = await todayData()
