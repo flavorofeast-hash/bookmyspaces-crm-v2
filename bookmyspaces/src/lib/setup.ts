@@ -1,6 +1,7 @@
 import { allowsDefaultAdmin, isProduction, passwordProblem } from './env'
-import { q, q1, isPgError } from './db'
+import { q, q1, tx, isPgError } from './db'
 import { hashPassword } from './password'
+import { writePriceAudit, type Actor } from './rates'
 
 const n = (v: FormDataEntryValue | null) => (v === null || v === '' ? null : Number(v))
 const s = (v: FormDataEntryValue | null) => { const t = String(v ?? '').trim(); return t ? t : null }
@@ -39,40 +40,66 @@ export async function saveProperty(f: FormData) {
 }
 
 /** Adds one space, or several rooms at once ("Room" + numbers 101..105). */
-export async function addSpaces(f: FormData): Promise<number> {
+export async function addSpaces(f: FormData, actor?: Actor): Promise<number> {
   const propertyId = s(f.get('property_id')), kind = s(f.get('kind')) ?? 'room', base = s(f.get('name'))
   if (!propertyId) throw new Error('Choose a property.')
   if (!base) throw new Error('Name is required.')
   const count = Math.min(50, Math.max(1, Number(f.get('count') ?? 1) || 1))
   const start = n(f.get('start_number'))
-  const unit = s(f.get('price_unit')) ?? (kind === 'room' ? 'night' : 'slot')
+  const unit = f.has('price_unit') ? s(f.get('price_unit')) : (kind === 'room' ? 'night' : 'slot')
+  const minP = n(f.get('min_price')), maxP = n(f.get('max_price')), price = n(f.get('price'))
   const names = count === 1 && start === null ? [base] : Array.from({ length: count }, (_, i) => `${base} ${(start ?? 1) + i}`)
   let added = 0
   for (const name of names) {
     try {
-      await q(`INSERT INTO crm.spaces (property_id, name, kind, room_type, capacity, facilities, price, price_unit, description, max_occupancy, booking_rules)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-        [propertyId, name, kind, s(f.get('room_type')), n(f.get('capacity')), s(f.get('facilities')), n(f.get('price')), unit,
-          s(f.get('description')), n(f.get('max_occupancy')), s(f.get('booking_rules'))])
+      await tx(async (db) => {
+        const r = await q1<{ id: string; property: string }>(`INSERT INTO crm.spaces (property_id, name, kind, room_type, capacity, facilities, price, price_unit, description, max_occupancy, booking_rules, min_price, max_price)
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id, (SELECT name FROM crm.properties WHERE id = $1) AS property`,
+          [propertyId, name, kind, s(f.get('room_type')), n(f.get('capacity')), s(f.get('facilities')), price, unit,
+            s(f.get('description')), n(f.get('max_occupancy')), s(f.get('booking_rules')), minP, maxP], db)
+        if (actor && r) {
+          const sp = { id: r.id, name, property: r.property }
+          await writePriceAudit(db, actor, sp, 'range', null, minP === null && maxP === null ? null : `${minP ?? '—'} – ${maxP ?? '—'}`)
+          await writePriceAudit(db, actor, sp, 'standard', null, price === null ? null : String(price))
+          await writePriceAudit(db, actor, sp, 'unit', null, unit)
+        }
+      })
       added++
     } catch (e) {
       if (isPgError(e, '23505')) throw new Error(`“${name}” already exists in this property${added ? ` (added ${added} before it)` : ''}.`)
+      if (isPgError(e, '23514')) throw new Error('Check the prices: the minimum must not exceed the maximum, and the standard rate must be inside the range.')
       throw e
     }
   }
   return added
 }
 
-export async function updateSpace(f: FormData) {
+export async function updateSpace(f: FormData, actor?: Actor) {
   const id = s(f.get('id')), name = s(f.get('name'))
   if (!id || !name) throw new Error('Name is required.')
+  const price = n(f.get('price')), minP = n(f.get('min_price')), maxP = n(f.get('max_price'))
+  const unit = f.has('price_unit') ? s(f.get('price_unit')) : 'night'
   try {
-    await q(`UPDATE crm.spaces SET name=$2, kind=$3, room_type=$4, capacity=$5, facilities=$6, price=$7, price_unit=$8, active=$9,
-        description=$10, max_occupancy=$11, booking_rules=$12 WHERE id=$1`,
-      [id, name, s(f.get('kind')) ?? 'room', s(f.get('room_type')), n(f.get('capacity')), s(f.get('facilities')), n(f.get('price')),
-        s(f.get('price_unit')) ?? 'night', f.get('active') === 'on', s(f.get('description')), n(f.get('max_occupancy')), s(f.get('booking_rules'))])
+    await tx(async (db) => {
+      const old = await q1<any>(`SELECT s.id, s.name, s.price, s.min_price, s.max_price, s.price_unit, p.name AS property FROM crm.spaces s LEFT JOIN crm.properties p ON p.id = s.property_id WHERE s.id = $1 FOR UPDATE OF s`, [id], db)
+      if (!old) throw new Error('Room or space not found.')
+      await q(`UPDATE crm.spaces SET name=$2, kind=$3, room_type=$4, capacity=$5, facilities=$6, price=$7, price_unit=$8, active=$9,
+          description=$10, max_occupancy=$11, booking_rules=$12, min_price=$13, max_price=$14 WHERE id=$1`,
+        [id, name, s(f.get('kind')) ?? 'room', s(f.get('room_type')), n(f.get('capacity')), s(f.get('facilities')), price,
+          unit, f.get('active') === 'on', s(f.get('description')), n(f.get('max_occupancy')), s(f.get('booking_rules')), minP, maxP], db)
+      if (actor) {
+        const sp = { id, name, property: old.property }
+        const m = (v: any) => (v === null || v === undefined ? null : String(Number(v)))
+        const rng = (a: any, b: any) => (a === null && b === null ? null : `${m(a) ?? '—'} – ${m(b) ?? '—'}`)
+        await writePriceAudit(db, actor, sp, 'range', rng(old.min_price, old.max_price), rng(minP, maxP))
+        await writePriceAudit(db, actor, sp, 'standard', m(old.price), m(price))
+        await writePriceAudit(db, actor, sp, 'unit', old.price_unit, unit)
+      }
+    })
   } catch (e) {
     if (isPgError(e, '23505')) throw new Error(`Another space in this property is already called “${name}”.`)
+    if (isPgError(e, '23514')) throw new Error('Check the prices: the minimum must not exceed the maximum, and the standard rate must be inside the range.')
+    if (isPgError(e, 'P0001')) throw new Error(e.message)
     throw e
   }
 }

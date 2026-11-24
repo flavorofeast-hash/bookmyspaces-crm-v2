@@ -101,7 +101,7 @@ export default async function BookingPage(props: { params: Promise<{ id: string 
                 <Reveal label="+ Add room / space">
                   <form action={addItemAction} className="space-y-2">
                     <Hidden name="booking_id" value={b.id} /><Hidden name="line_type" value="space" />
-                    <select name="space_id" required className="input">{spaces.filter((s) => s.price !== null).map((s) => <option key={s.id} value={s.id}>{s.property_name} · {s.name} ({inr(s.price)}/{s.price_unit})</option>)}</select>
+                    <select name="space_id" required className="input">{spaces.filter((s) => s.price !== null && s.price_unit).map((s) => <option key={s.id} value={s.id}>{s.property_name} · {s.name} ({inr(s.price)}/{s.price_unit}{s.min_price != null ? `, allowed ${inr(s.min_price)}–${inr(s.max_price)}` : ''})</option>)}</select>
                     <div className="grid grid-cols-2 gap-2">
                       <Field label="From date"><input type="date" name="start_date" required defaultValue={istDate(new Date(b.start_at))} className="input" /></Field>
                       <Field label="time"><input type="time" name="start_time" defaultValue="14:00" className="input" /></Field>

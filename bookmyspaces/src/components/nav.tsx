@@ -11,6 +11,7 @@ const ICONS: Record<string, string> = {
   billing: 'M7 3h10l3 3v15H4V3h3zm2 6h6m-6 4h6m-6 4h4',
   inbox: 'M4 5h16v11H8l-4 4V5z',
   marketing: 'M3 11l15-6v14L3 13v-2zm4 3v4a2 2 0 004 0v-3',
+  rates: 'M12 3v18M17 7H9.5a3 3 0 000 6h5a3 3 0 010 6H6',
 }
 
 export const NAV = [
@@ -20,6 +21,7 @@ export const NAV = [
   { href: '/billing', label: 'Billing', icon: 'billing' },
   { href: '/inbox', label: 'Inbox', icon: 'inbox' },
   { href: '/marketing', label: 'Marketing', icon: 'marketing' },
+  { href: '/rates', label: 'Rates', icon: 'rates', mobileTop: true },
 ]
 
 function Icon({ name }: { name: string }) {
@@ -61,6 +63,7 @@ export function Nav({ unread, userName, isOwner, businessName }: { unread: numbe
       <header className="no-print md:hidden sticky top-0 z-20 flex items-center justify-between bg-slate-900 text-white px-4 py-3">
         <span className="font-semibold">{businessName}</span>
         <div className="flex items-center gap-3 text-sm">
+          <Link href="/rates" className="text-slate-300">Rates</Link>
           {isOwner && <Link href="/settings" className="text-slate-300">Settings</Link>}
           <form action="/logout" method="post"><button className="text-slate-300">Sign out</button></form>
         </div>
@@ -68,7 +71,7 @@ export function Nav({ unread, userName, isOwner, businessName }: { unread: numbe
 
       {/* Mobile bottom nav */}
       <nav className="no-print md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-slate-200 grid grid-cols-6">
-        {NAV.map((n) => (
+        {NAV.filter((n) => !('mobileTop' in n)).map((n) => (
           <Link key={n.href} href={n.href} className={clsx('relative flex flex-col items-center gap-0.5 py-2 text-[11px]', active(n.href) ? 'text-brand-600 font-medium' : 'text-slate-500')}>
             <Icon name={n.icon} />
             {n.label}

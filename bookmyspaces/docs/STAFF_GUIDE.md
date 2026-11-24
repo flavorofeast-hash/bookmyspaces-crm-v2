@@ -21,8 +21,14 @@
 - **Marketing** — campaigns with tracking links and a post calendar (posting to Facebook/Instagram is manual until connected).
 - **Settings** (owner only) — business details, properties, rooms & spaces, prices, time slots, food packages, staff logins.
 
+## Rates (menu → Rates, any login)
+- Each room/space shows the owner's **allowed range**. Type a **Standard** rate and, if needed, a different rate for any weekday (Mon–Sun) → **Save**. Empty weekday = standard rate applies.
+- **Date-specific rates** (festivals, weddings season): choose room/space, date and rate. A date rate beats the weekday rate, which beats the standard rate.
+- A rate outside the range is refused. Every change is saved in **Price history** with your name and login — it cannot be edited or deleted.
+- New bookings use the rate for each night/date. Quotations and bills already issued never change.
+
 ## Owner: completing inventory (Settings)
-- **Rooms & spaces** → **Edit** on a row: name, category, capacity, max occupancy, price and unit, facilities, description, booking rules, active. A space is bookable only when it is **active and has a price**; the table shows *Not bookable (no price)* until then.
+- **Rooms & spaces** → **Edit** on a row: name, category, capacity, max occupancy, **minimum and maximum price**, standard rate, pricing unit, facilities, description, booking rules, active. A space is bookable only when it is **active, has a standard rate and a confirmed pricing unit**.
 - **Properties** → booking rules, **Food packages** switch.
 - **Packages** → name, property, menu, price per person, minimum guests, add-ons, available. Only available, priced packages are offered on bookings.
 

@@ -11,11 +11,11 @@ const B = '/settings'
 export async function saveSettingsAction(f: FormData) { await requireOwner(); await run(B, 'Business details saved.', async () => { await saveSettings(f) }) }
 export async function savePropertyAction(f: FormData) { await requireOwner(); await run(B + '#properties', 'Property saved.', async () => { await saveProperty(f) }) }
 export async function addSpacesAction(f: FormData) {
-  await requireOwner()
+  const u = await requireOwner()
   let n = 0
-  await run(B + '#spaces', 'Saved.', async () => { n = await addSpaces(f); return `${B}?added=${n}#spaces` })
+  await run(B + '#spaces', 'Saved.', async () => { n = await addSpaces(f, u); return `${B}?added=${n}#spaces` })
 }
-export async function updateSpaceAction(f: FormData) { await requireOwner(); await run(B + '#spaces', 'Space updated.', async () => { await updateSpace(f) }) }
+export async function updateSpaceAction(f: FormData) { const u = await requireOwner(); await run(B + '#spaces', 'Space updated.', async () => { await updateSpace(f, u) }) }
 export async function savePackageAction(f: FormData) { await requireOwner(); await run(B + '#packages', 'Package saved.', async () => { await savePackage(f) }) }
 export async function saveSlotAction(f: FormData) { await requireOwner(); await run(B + '#slots', 'Time slot saved.', async () => { await saveSlot(f) }) }
 export async function createUserAction(f: FormData) { await requireOwner(); await run(B + '#users', 'User added. Give them their email and password.', async () => { await createUser(f) }) }

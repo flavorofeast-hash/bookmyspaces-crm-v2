@@ -2,14 +2,17 @@ import { q, q1, tx, isPgError, type Db } from './db'
 import { logActivity } from './activity'
 import { createCustomer, findCustomerByPhone } from './customers'
 import { istDate, istToDate, addDays } from './format'
+import { ratesFor } from './rates'
 
 export type Space = {
   id: string; property_id: string; property_name: string; name: string; kind: 'room' | 'hall' | 'rooftop' | 'other'
-  room_type: string | null; capacity: number | null; facilities: string | null; price: string | null; price_unit: string; active: boolean
+  room_type: string | null; capacity: number | null; facilities: string | null; price: string | null; price_unit: string | null; active: boolean
+  min_price?: string | null; max_price?: string | null
 }
 
 export type AvailabilitySpace = Space & {
   status: 'free' | 'booked' | 'tentative' | 'not_configured'
+  rate: number | null // rate for the first date (date-specific, else weekday, else standard)
   conflicts: { booking_id: string; ref: string; status: string; customer: string; start_at: string; end_at: string }[]
 }
 
@@ -35,12 +38,13 @@ export async function availability(start: Date, end: Date, kinds?: string[], exc
        AND tstzrange(i.start_at, i.end_at, '[)') && tstzrange($1, $2, '[)')
        AND ($3::uuid IS NULL OR b.id <> $3::uuid)
      ORDER BY i.start_at`, [start, end, excludeBookingId ?? null])
+  const rate = await ratesFor(undefined, spaces, [istDate(start)])
   return spaces
     .filter((s) => !kinds || kinds.includes(s.kind))
     .map((s) => {
       const mine = rows.filter((r) => r.space_id === s.id)
-      const status = s.price === null ? 'not_configured' : mine.some((r) => r.holds) ? 'booked' : mine.length ? 'tentative' : 'free'
-      return { ...s, status, conflicts: mine.map(({ booking_id, ref, status, customer, start_at, end_at }) => ({ booking_id, ref, status, customer, start_at, end_at })) }
+      const status = s.price === null || s.price_unit === null ? 'not_configured' : mine.some((r) => r.holds) ? 'booked' : mine.length ? 'tentative' : 'free'
+      return { ...s, status, rate: rate(s, istDate(start)), conflicts: mine.map(({ booking_id, ref, status, customer, start_at, end_at }) => ({ booking_id, ref, status, customer, start_at, end_at })) }
     })
 }
 
@@ -96,14 +100,30 @@ async function conflictDetails(bookingId: string, db: Db) {
 async function addSpaceLines(db: Db, bookingId: string, spaceIds: string[], start: Date, end: Date, ctx: { nights: number; hours: number; guests: number }) {
   if (!spaceIds.length) return
   const spaces = await q<Space>(`SELECT s.*, p.name AS property_name FROM crm.spaces s JOIN crm.properties p ON p.id = s.property_id WHERE s.id = ANY($1::uuid[])`, [spaceIds], db)
+  const nights = Math.max(1, ctx.nights), first = istDate(start)
+  const dates = Array.from({ length: nights }, (_, k) => addDays(first, k))
+  const rate = await ratesFor(db, spaces, dates)
   let i = 0
+  const insert = (s: Space, desc: string, a: Date, b: Date, qty: number, price: number) => q(
+    `INSERT INTO crm.booking_items (booking_id, line_type, space_id, description, start_at, end_at, qty, unit_price, sort_order)
+     VALUES ($1,'space',$2,$3,$4,$5,$6,$7,$8)`, [bookingId, s.id, desc, a, b, qty, price, i++], db)
   for (const s of spaces) {
-    if (s.price === null || !s.active) throw new Error(`${s.name} (${s.property_name}) is not configured for booking yet (inactive or no price set). Complete it in Settings → Rooms & spaces first.`)
+    if (s.price === null || s.price_unit === null || !s.active) throw new Error(`${s.name} (${s.property_name}) is not configured for booking yet (inactive, no price or no pricing unit). Complete it in Settings → Rooms & spaces first.`)
+    const name = `${s.property_name} · ${s.name}`
+    if (s.price_unit === 'night') {
+      // Per-night rates (weekday / date-specific). Consecutive nights at the same rate share one line; lines join at the check-in time so the room stays held.
+      const runs: { from: number; n: number; price: number }[] = []
+      dates.forEach((d, k) => { const p = rate(s, d)!; const last = runs[runs.length - 1]; if (last && last.price === p) last.n++; else runs.push({ from: k, n: 1, price: p }) })
+      for (const [r, run] of runs.entries()) {
+        const a = r === 0 ? start : new Date(start.getTime() + run.from * 864e5)
+        const b = r === runs.length - 1 ? end : new Date(start.getTime() + (run.from + run.n) * 864e5)
+        await insert(s, `${name} (${run.n} night${run.n === 1 ? '' : 's'}${runs.length > 1 ? ` from ${dates[run.from]}` : ''})`, a, b, run.n, run.price)
+      }
+      continue
+    }
     const qty = qtyFor(s, ctx)
-    const desc = `${s.property_name} · ${s.name}` + (qty > 1 || s.price_unit !== 'slot' ? ` (${qty} ${unitLabel[s.price_unit] ?? s.price_unit}${qty === 1 ? '' : 's'})` : '')
-    await q(
-      `INSERT INTO crm.booking_items (booking_id, line_type, space_id, description, start_at, end_at, qty, unit_price, sort_order)
-       VALUES ($1,'space',$2,$3,$4,$5,$6,$7,$8)`, [bookingId, s.id, desc, start, end, qty, s.price, i++], db)
+    const desc = name + (qty > 1 || s.price_unit !== 'slot' ? ` (${qty} ${unitLabel[s.price_unit] ?? s.price_unit}${qty === 1 ? '' : 's'})` : '')
+    await insert(s, desc, start, end, qty, rate(s, first)!)
   }
 }
 
@@ -194,6 +214,13 @@ export async function addBookingItem(bookingId: string, item: { lineType: 'space
     if (!item.description.trim()) throw new Error('Describe the item.')
     if (!(item.qty > 0)) throw new Error('Quantity must be more than 0.')
     if (!(item.unitPrice >= 0)) throw new Error('Price cannot be negative.')
+    if (item.lineType === 'space' && item.spaceId) {
+      const sp = await q1<{ name: string; price_unit: string | null; min_price: string | null; max_price: string | null }>(`SELECT name, price_unit, min_price, max_price FROM crm.spaces WHERE id = $1`, [item.spaceId], db)
+      if (!sp) throw new Error('Room or space not found.')
+      if (sp.price_unit === null) throw new Error(`${sp.name} has no confirmed pricing unit yet, so it cannot be booked.`)
+      if ((sp.min_price !== null && item.unitPrice < Number(sp.min_price)) || (sp.max_price !== null && item.unitPrice > Number(sp.max_price)))
+        throw new Error(`₹${item.unitPrice} is outside the allowed range for ${sp.name} (₹${Number(sp.min_price ?? 0)} – ₹${Number(sp.max_price ?? 0)}).`)
+    }
     await q(`SAVEPOINT add_item`, [], db)
     try {
       await q(

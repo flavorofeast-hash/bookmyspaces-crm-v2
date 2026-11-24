@@ -9,7 +9,7 @@ import { SubmitButton } from '@/components/client'
 import { inr, fmtDateTime } from '@/lib/format'
 
 const KINDS: Record<string, string> = { room: 'Room', hall: 'Hall', rooftop: 'Rooftop', other: 'Other space' }
-const UNITS: Record<string, string> = { night: 'per night', slot: 'per slot', day: 'per day', hour: 'per hour', person: 'per guest' }
+const UNITS: Record<string, string> = { night: 'per night', slot: 'per slot / event', day: 'per day', hour: 'per hour', person: 'per guest', session: 'per session' }
 
 function SpaceFields({ s }: { s?: any }) {
   return (
@@ -18,8 +18,10 @@ function SpaceFields({ s }: { s?: any }) {
       <Field label="Category"><input name="room_type" defaultValue={s?.room_type ?? ''} placeholder="NOT CONFIGURED (e.g. Deluxe AC)" className="input" /></Field>
       <Field label="Capacity (guests)"><input type="number" name="capacity" min={0} defaultValue={s?.capacity ?? ''} placeholder="NOT CONFIGURED" className="input" /></Field>
       <Field label="Max occupancy"><input type="number" name="max_occupancy" min={0} defaultValue={s?.max_occupancy ?? ''} placeholder="NOT CONFIGURED" className="input" /></Field>
-      <Field label="Price / rate (₹)" hint="Leave empty until known — it cannot be booked without a price"><input type="number" name="price" min={0} step="1" defaultValue={s && s.price !== null ? Number(s.price) : ''} placeholder="NOT CONFIGURED" className="input" /></Field>
-      <Field label="Price is"><select name="price_unit" defaultValue={s?.price_unit ?? 'night'} className="input">{Object.entries(UNITS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
+      <Field label="Minimum price (₹)" hint="Owner-set lower limit for staff"><input type="number" name="min_price" min={0} step="1" defaultValue={s && s.min_price !== null && s.min_price !== undefined ? Number(s.min_price) : ''} placeholder="NOT CONFIGURED" className="input" /></Field>
+      <Field label="Maximum price (₹)" hint="Owner-set upper limit for staff"><input type="number" name="max_price" min={0} step="1" defaultValue={s && s.max_price !== null && s.max_price !== undefined ? Number(s.max_price) : ''} placeholder="NOT CONFIGURED" className="input" /></Field>
+      <Field label="Standard rate (₹)" hint="Leave empty until known — it cannot be booked without a rate. Weekday/date rates: Rates page"><input type="number" name="price" min={0} step="1" defaultValue={s && s.price !== null ? Number(s.price) : ''} placeholder="NOT CONFIGURED" className="input" /></Field>
+      <Field label="Price is"><select name="price_unit" defaultValue={s ? s.price_unit ?? '' : 'night'} className="input"><option value="">NOT CONFIRMED (cannot be booked)</option>{Object.entries(UNITS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></Field>
       <Field label="Facilities & amenities"><input name="facilities" defaultValue={s?.facilities ?? ''} placeholder="NOT CONFIGURED (e.g. AC, TV)" className="input" /></Field>
       <Field label="Description"><input name="description" defaultValue={s?.description ?? ''} placeholder="NOT CONFIGURED" className="input" /></Field>
       <Field label="Booking rules"><input name="booking_rules" defaultValue={s?.booking_rules ?? ''} placeholder="e.g. min 2 nights, no events after 10 pm" className="input" /></Field>
@@ -108,8 +110,8 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
                       <tbody>{list.map((x) => (
                         <tr key={x.id} className={x.active ? '' : 'text-slate-400'}>
                           <td className="font-medium">{x.name}</td><td>{KINDS[x.kind]} · {x.room_type ?? <span className="text-amber-700">category not configured</span>}</td><td>{x.capacity ?? <span className="text-amber-700">NOT CONFIGURED</span>}</td>
-                          <td>{x.price === null ? <span className="text-amber-700">NOT CONFIGURED</span> : <>{inr(x.price)} {UNITS[x.price_unit]}</>}</td><td className="text-xs">{x.facilities ?? <span className="text-amber-700">NOT CONFIGURED</span>}</td>
-                          <td>{!x.active ? 'Hidden' : x.price === null ? <span className="text-amber-700">Not bookable (no price)</span> : 'Bookable'}</td>
+                          <td>{x.price === null ? <span className="text-amber-700">rate NOT CONFIGURED</span> : <>{inr(x.price)}</>} <span className="text-xs">{x.price_unit ? UNITS[x.price_unit] : <span className="text-amber-700">unit NOT CONFIRMED</span>}</span>{x.min_price !== null && <div className="text-xs muted">range {inr(x.min_price)} – {inr(x.max_price)}</div>}</td><td className="text-xs">{x.facilities ?? <span className="text-amber-700">NOT CONFIGURED</span>}</td>
+                          <td>{!x.active ? 'Hidden' : x.price === null ? <span className="text-amber-700">Not bookable (no rate)</span> : !x.price_unit ? <span className="text-amber-700">Not bookable (unit not confirmed)</span> : 'Bookable'}</td>
                           <td><Reveal label="Edit">
                             <form action={A.updateSpaceAction} className="grid sm:grid-cols-2 gap-2 min-w-[18rem]">
                               <Hidden name="id" value={x.id} />

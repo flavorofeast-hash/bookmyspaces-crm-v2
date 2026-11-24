@@ -24,7 +24,7 @@ function SpaceList({ spaces, name, unit }: { spaces: AvailabilitySpace[]; name: 
                 <input type="checkbox" name={name} value={s.id} disabled={s.status === 'booked' || s.status === 'not_configured'} className="mt-1" />
                 <span className="flex-1">
                   <span className="font-medium">{s.name}</span> <Badge value={s.status} label={s.status === 'free' ? 'Free' : s.status === 'booked' ? 'Booked' : s.status === 'not_configured' ? 'Not configured' : 'Enquiry pending'} />
-                  <span className="block text-xs muted">{[s.room_type, s.capacity ? `up to ${s.capacity}` : null, s.price === null ? 'price NOT CONFIGURED' : `${inr(s.price)}/${s.price_unit}`].filter(Boolean).join(' · ')}</span>
+                  <span className="block text-xs muted">{[s.room_type, s.capacity ? `up to ${s.capacity}` : null, s.price === null ? 'price NOT CONFIGURED' : !s.price_unit ? 'pricing unit NOT CONFIRMED' : `${inr(s.rate ?? s.price)}/${s.price_unit}`].filter(Boolean).join(' · ')}</span>
                   {s.conflicts.map((c) => <span key={c.booking_id + c.start_at} className="block text-xs text-slate-600">{c.ref} · {c.customer} · {fmtDateTime(c.start_at)} – {fmtDateTime(c.end_at)} ({c.status})</span>)}
                 </span>
               </label>
