@@ -42,3 +42,25 @@ export async function removeDateRateAction(f: FormData) {
   const u = await requireUser()
   await run(`${B}#dates`, 'Date rate removed.', async () => { await setRate(u, str(f, 'space_id'), 'date', null, { onDate: str(f, 'on_date') }) })
 }
+
+/** Same standard / Saturday / Sunday rate for a whole group (e.g. all 12 AC rooms). Empty fields are left unchanged. All values are checked before anything is saved. */
+export async function saveGroupRatesAction(f: FormData) {
+  const u = await requireUser()
+  const ids = str(f, 'space_ids').split(',').filter((x) => /^[0-9a-f-]{36}$/i.test(x))
+  await run(`${B}#p-${str(f, 'property_id')}`, `Rates saved for ${ids.length} rooms/spaces.`, async () => {
+    if (!ids.length) throw new Error('Choose a group.')
+    const vals = { standard: num(str(f, 'standard')), w6: num(str(f, 'w6')), w7: num(str(f, 'w7')) }
+    if (vals.standard === null && vals.w6 === null && vals.w7 === null) throw new Error('Type at least one rate.')
+    const sp = await q<{ id: string; name: string; min_price: string | null; max_price: string | null }>(`SELECT id, name, min_price, max_price FROM crm.spaces WHERE id = ANY($1::uuid[])`, [ids])
+    for (const s of sp) {
+      if (s.min_price === null || s.max_price === null) throw new Error(`The owner has not set a minimum and maximum price for ${s.name} yet. Nothing was saved.`)
+      for (const v of Object.values(vals)) if (v !== null && (!Number.isFinite(v) || v < Number(s.min_price) || v > Number(s.max_price)))
+        throw new Error(`₹${v} is outside the allowed range for ${s.name} (₹${Number(s.min_price)} – ₹${Number(s.max_price)}). Nothing was saved.`)
+    }
+    for (const s of sp) {
+      if (vals.standard !== null) await setRate(u, s.id, 'standard', vals.standard)
+      if (vals.w6 !== null) await setRate(u, s.id, 'weekday', vals.w6, { weekday: 6 })
+      if (vals.w7 !== null) await setRate(u, s.id, 'weekday', vals.w7, { weekday: 7 })
+    }
+  })
+}

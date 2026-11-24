@@ -222,6 +222,7 @@ export default async function BookingPage(props: { params: Promise<{ id: string 
             <form action={addFollowUpAction} className="space-y-2 mt-2">
               <Hidden name="customer_id" value={b.customer_id} /><Hidden name="booking_id" value={b.id} /><Hidden name="back" value={back} />
               <input type="date" name="due_on" required defaultValue={addDays(istDate(), 1)} className="input" />
+              <select name="method" defaultValue="call" className="input" aria-label="How"><option value="call">Call</option><option value="whatsapp">WhatsApp</option><option value="visit">Visit</option><option value="email">Email</option></select>
               <input name="note" required placeholder="e.g. Remind about balance" className="input" />
               <SubmitButton className="btn-secondary btn-sm">Add follow-up</SubmitButton>
             </form>

@@ -1,7 +1,7 @@
 import { requireUser } from '@/lib/auth'
 import { q } from '@/lib/db'
 import { priceHistory, WEEKDAY_NAMES } from '@/lib/rates'
-import { saveWeekRatesAction, saveDateRateAction, removeDateRateAction } from './actions'
+import { saveWeekRatesAction, saveDateRateAction, removeDateRateAction, saveGroupRatesAction } from './actions'
 import { PageHeader, Card, Flash, Hidden, Empty } from '@/components/ui'
 import { SubmitButton } from '@/components/client'
 import { inr, fmtDate, fmtDateTime, istDate } from '@/lib/format'
@@ -15,7 +15,7 @@ export default async function RatesPage(props: { searchParams: Promise<{ ok?: st
   const sp = await props.searchParams
   const today = istDate()
   const [spaces, weekly, dated, history] = await Promise.all([
-    q<any>(`SELECT s.id, s.name, s.kind, s.price, s.price_unit, s.min_price, s.max_price, p.id AS property_id, p.name AS property
+    q<any>(`SELECT s.id, s.name, s.kind, s.room_type, s.price, s.price_unit, s.min_price, s.max_price, p.id AS property_id, p.name AS property
       FROM crm.spaces s JOIN crm.properties p ON p.id = s.property_id WHERE s.active AND p.active ORDER BY p.sort_order, p.name, s.sort_order, s.name`),
     q<any>(`SELECT space_id, weekday, price FROM crm.space_rates WHERE weekday IS NOT NULL`),
     q<any>(`SELECT r.space_id, to_char(r.on_date, 'YYYY-MM-DD') AS on_date, r.price, s.name FROM crm.space_rates r JOIN crm.spaces s ON s.id = r.space_id WHERE r.on_date >= $1::date ORDER BY r.on_date, s.name`, [today]),
@@ -31,6 +31,24 @@ export default async function RatesPage(props: { searchParams: Promise<{ ok?: st
         {props_.length === 0 && <Empty>No rooms or spaces yet.</Empty>}
         {props_.map(([pid, pname]) => (
           <Card key={pid} title={pname} pad={false}>
+            {(() => {
+              const KN: Record<string, string> = { room: 'rooms', hall: 'halls', rooftop: 'rooftops', other: 'other spaces' }
+              const groups = Object.values(spaces.filter((x) => x.property_id === pid && x.min_price !== null && x.max_price !== null).reduce<Record<string, { label: string; ids: string[] }>>((a, x) => {
+                const k = `${x.room_type ?? x.kind}|${x.min_price}|${x.max_price}`
+                const g = (a[k] ??= { label: `${x.room_type ? `${x.room_type} ${KN[x.kind] ?? ''}` : KN[x.kind] ?? x.kind} · ${inr(x.min_price)}–${inr(x.max_price)}`, ids: [] })
+                g.ids.push(x.id); return a
+              }, {}))
+              return groups.length > 0 && (
+                <form id={`p-${pid}`} action={saveGroupRatesAction} className="card-pad flex flex-wrap gap-2 items-end border-b border-slate-100 bg-slate-50">
+                  <Hidden name="property_id" value={pid} />
+                  <label className="block"><span className="label">Set for a whole group</span><select name="space_ids" className="input">{groups.map((g) => <option key={g.ids.join()} value={g.ids.join(',')}>{g.label} ({g.ids.length})</option>)}</select></label>
+                  <label className="block"><span className="label">Standard ₹</span><input type="number" name="standard" min={0} className="input w-24" /></label>
+                  <label className="block"><span className="label">Saturday ₹</span><input type="number" name="w6" min={0} className="input w-24" /></label>
+                  <label className="block"><span className="label">Sunday ₹</span><input type="number" name="w7" min={0} className="input w-24" /></label>
+                  <SubmitButton className="btn-primary">Apply to group</SubmitButton>
+                  <span className="text-xs muted w-full">Empty boxes are left unchanged. Change single rooms in the table below.</span>
+                </form>)
+            })()}
             <div className="overflow-x-auto"><table className="table text-sm">
               <thead><tr><th>Room / space</th><th>Allowed range</th><th>Standard</th>{[1, 2, 3, 4, 5, 6, 7].map((w) => <th key={w}>{WEEKDAY_NAMES[w]}</th>)}<th></th></tr></thead>
               <tbody>{spaces.filter((s) => s.property_id === pid).map((s) => {

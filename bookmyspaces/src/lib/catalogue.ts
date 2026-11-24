@@ -81,7 +81,7 @@ export async function addCatalogueItem(bookingId: string, item: { type: 'package
     if (perPerson && !guests) throw new Error('Enter the number of guests in the booking Details first.')
     const qty = perPerson ? Math.max(guests, Number(p.min_guests ?? 0)) : 1
     const inc = p.inclusions?.length ? ` — includes: ${p.inclusions.join(', ')}` : p.description ? ` — ${p.description}` : ''
-    await addBookingItem(bookingId, { lineType: p.kind === 'event' ? 'extra' : 'food', description: `${p.name}${perPerson ? ` (${qty} guests${qty > guests ? `, minimum ${p.min_guests}` : ''})` : ' package'}${inc}`, qty, unitPrice: Number(p.price) }, userId)
+    await addBookingItem(bookingId, { lineType: p.kind === 'event' ? 'extra' : 'food', description: `${p.name}${perPerson ? ` (${qty} guests${qty > guests ? `, minimum ${p.min_guests}` : ''})` : ' package'}${inc}${p.max_guests && !perPerson ? ` (up to ${p.max_guests} guests)` : ''}`, qty, unitPrice: Number(p.price), packageId: p.id }, userId)
     return
   }
   const a = await q1<any>(`SELECT * FROM crm.addons WHERE id = $1`, [item.id])
@@ -89,6 +89,16 @@ export async function addCatalogueItem(bookingId: string, item: { type: 'package
   const min = Number(a.price_min), max = Number(a.price_max ?? a.price_min)
   const price = item.price === null || item.price === undefined || Number.isNaN(item.price) ? min : item.price
   if (price < min || price > max) throw new Error(`₹${price} is outside the approved price for ${a.name} (₹${min}${max !== min ? ` – ₹${max}` : ''}).`)
-  const qty = a.unit === 'per_person' ? Math.max(1, Number(item.qty ?? guests) || 0) : Math.max(1, Number(item.qty ?? 1) || 1)
-  await addBookingItem(bookingId, { lineType: a.category === 'food' ? 'food' : 'extra', description: a.unit === 'per_person' ? `${a.name} (${qty} guests)` : a.name, qty, unitPrice: price }, userId)
+  let qty = a.unit === 'per_person' ? Math.max(1, Number(item.qty ?? guests) || 0) : Math.max(1, Number(item.qty ?? 1) || 1)
+  let note = ''
+  if (a.category === 'guests' && (item.qty === null || item.qty === undefined || Number.isNaN(item.qty))) {
+    // Extra guests = booking guests above the event package's guest limit.
+    const lim = await q1<{ max_guests: number | null; name: string }>(`SELECT p.max_guests, p.name FROM crm.booking_items i JOIN crm.packages p ON p.id = i.package_id
+      WHERE i.booking_id = $1 AND p.kind = 'event' AND p.max_guests IS NOT NULL ORDER BY p.max_guests DESC LIMIT 1`, [bookingId])
+    if (!lim) throw new Error('No package with a guest limit on this booking — type the number of extra guests.')
+    const extra = guests - Number(lim.max_guests)
+    if (extra <= 0) throw new Error(`${guests} guests is within the ${lim.name} limit of ${lim.max_guests}; no extra guests to charge.`)
+    qty = extra; note = ` above the ${lim.name} limit of ${lim.max_guests}`
+  }
+  await addBookingItem(bookingId, { lineType: a.category === 'food' ? 'food' : 'extra', description: a.unit === 'per_person' ? `${a.name} (${qty} guests${note})` : a.name, qty, unitPrice: price, addonId: a.id }, userId)
 }

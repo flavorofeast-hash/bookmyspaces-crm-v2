@@ -9,7 +9,7 @@ export async function todayData(now = new Date()) {
   const monthStart = istToDate(today.slice(0, 8) + '01', '00:00')
 
   const [followUps, newEnquiries, unread, checkIns, checkOuts, eventsToday, upcomingRooms, upcomingEvents, spaces, money, dueSoon, activity, quoted] = await Promise.all([
-    q<any>(`SELECT f.*, c.name AS customer_name, c.phone FROM crm.follow_ups f JOIN crm.customers c ON c.id = f.customer_id
+    q<any>(`SELECT f.*, c.name AS customer_name, c.phone, COALESCE(c.whatsapp, c.phone) AS wa FROM crm.follow_ups f JOIN crm.customers c ON c.id = f.customer_id
             WHERE f.done_at IS NULL AND f.due_on <= $1::date ORDER BY f.due_on, f.created_at LIMIT 30`, [today]),
     q<any>(`SELECT c.id, c.name, c.phone, c.source, c.created_at, c.requirements,
               (SELECT b.id FROM crm.bookings b WHERE b.customer_id = c.id ORDER BY b.created_at DESC LIMIT 1) AS booking_id,

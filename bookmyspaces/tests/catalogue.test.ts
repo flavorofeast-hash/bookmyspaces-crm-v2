@@ -69,4 +69,30 @@ describe('packages, food and add-ons', () => {
     await expect(q(`UPDATE crm.legacy_records SET amount = 1 WHERE id = $1`, [r.id])).rejects.toThrow(/read-only/)
     await expect(q(`DELETE FROM crm.legacy_records WHERE id = $1`, [r.id])).rejects.toThrow(/read-only/)
   })
+
+  it('never charges twice: same item, food or decoration already included in the package', async () => {
+    await savePackage(form({ name: 'Rooftop Silver', kind: 'event', food_type: 'both', price: '42000', price_basis: 'flat', max_guests: '60', review_status: 'approved', active: 'on', inclusions: 'Rooftop venue\nBasic decoration\nBuffet' }), owner)
+    await saveAddon(form({ name: 'Standard decor', category: 'decoration', price_min: '3000', review_status: 'approved', active: 'on', package_id: await pid('Rooftop Silver') }), owner)
+    const e = { spaceIds: [S.rooftop], start: ist('2027-08-07', '16:00'), end: ist('2027-08-07', '23:00'), hours: 0 }
+    const b = await createBooking({ customerId: c1, bookingType: 'event', guests: 70, event: e, start: e.start, end: e.end, packageId: await pid('Rooftop Silver') })
+    await expect(addCatalogueItem(b.id, { type: 'package', id: await pid('Rooftop Silver') })).rejects.toThrow(/already on this booking/)
+    await expect(addCatalogueItem(b.id, { type: 'package', id: await pid('Veg Buffet') })).rejects.toThrow(/already includes the food/)
+    await expect(addCatalogueItem(b.id, { type: 'addon', id: await aid('Standard decor') })).rejects.toThrow(/already included in Rooftop Silver/)
+    // extra guests are worked out from the package limit: 70 guests − 60 = 10
+    await addCatalogueItem(b.id, { type: 'addon', id: await aid('Extra guest') })
+    const full = await getBooking(b.id)
+    const extra = full.items.find((i: any) => i.description.startsWith('Extra guest'))
+    expect(extra).toMatchObject({ qty: '10.00', unit_price: '750.00' })
+    expect(extra.description).toContain('above the Rooftop Silver limit of 60')
+    await expect(addCatalogueItem(b.id, { type: 'addon', id: await aid('Extra guest') })).rejects.toThrow(/already on this booking/)
+    expect(Number(full.total)).toBe(42000 + 7500 + 12000) // package + extra guests + rooftop rental (separate line)
+    // the other way round: food first, then a package that includes food
+    const b2 = await createBooking({ customerId: c1, bookingType: 'event', guests: 50, event: { ...e, start: ist('2027-08-08', '16:00'), end: ist('2027-08-08', '23:00') }, start: ist('2027-08-08', '16:00'), end: ist('2027-08-08', '23:00') })
+    await addCatalogueItem(b2.id, { type: 'package', id: await pid('Veg Buffet') })
+    await expect(addCatalogueItem(b2.id, { type: 'package', id: await pid('Rooftop Silver') })).rejects.toThrow(/already includes food. Remove Veg Buffet/)
+    // guests within the limit: nothing extra to charge
+    const b3 = await createBooking({ customerId: c1, bookingType: 'event', guests: 40, event: { ...e, start: ist('2027-08-09', '16:00'), end: ist('2027-08-09', '23:00') }, start: ist('2027-08-09', '16:00'), end: ist('2027-08-09', '23:00'), packageId: await pid('Rooftop Silver') })
+    await expect(addCatalogueItem(b3.id, { type: 'addon', id: await aid('Extra guest') })).rejects.toThrow(/within the Rooftop Silver limit/)
+  })
 })
+

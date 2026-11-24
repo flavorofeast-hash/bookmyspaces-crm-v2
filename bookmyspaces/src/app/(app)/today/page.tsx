@@ -35,8 +35,9 @@ export default async function TodayPage(props: { searchParams: Promise<{ ok?: st
             <ul className="divide-y divide-slate-100">{d.followUps.map((f) => (
               <li key={f.id} className="py-2 flex items-start justify-between gap-2 text-sm">
                 <span><Link href={`/customers/${f.customer_id}`} className="link font-medium">{f.customer_name}</Link> — {f.note}
-                  <span className={`block text-xs ${f.due_on < d.today ? 'text-red-600' : 'muted'}`}>{f.due_on < d.today ? 'Overdue since ' : 'Due '}{fmtDate(f.due_on)}{f.phone ? ` · ${formatPhone(f.phone)}` : ''}</span></span>
-                <form action={completeFollowUpAction}><Hidden name="id" value={f.id} /><Hidden name="back" value="/today" /><SubmitButton className="btn-secondary btn-sm">Done</SubmitButton></form>
+                  <span className={`block text-xs ${f.due_on < d.today ? 'text-red-600' : 'muted'}`}>{f.due_on < d.today ? 'Overdue since ' : 'Due '}{fmtDate(f.due_on)}{f.method ? ` · ${f.method === 'whatsapp' ? 'WhatsApp' : f.method}` : ''}{f.phone ? ` · ${formatPhone(f.phone)}` : ''}</span></span>
+                <span className="flex gap-1 shrink-0">{f.phone && (f.method === 'whatsapp' ? <a href={waLink(f.wa, '') ?? undefined} target="_blank" rel="noreferrer" className="btn-secondary btn-sm">WhatsApp</a> : <a href={`tel:+${f.phone}`} className="btn-secondary btn-sm">Call</a>)}
+                <form action={completeFollowUpAction}><Hidden name="id" value={f.id} /><Hidden name="back" value="/today" /><SubmitButton className="btn-secondary btn-sm">Done</SubmitButton></form></span>
               </li>))}</ul>
           )}
         </Card>

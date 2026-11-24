@@ -179,8 +179,8 @@ export async function createBooking(input: NewBookingInput, userId?: string | nu
         if (p && (p.price === null || !p.active || p.review_status !== 'approved')) throw new Error(`The “${p.name}” package is not approved and available yet (Packages & Food).`)
         if (p) {
           const qty = p.price_basis === 'per_person' ? Math.max(1, guests, Number(p.min_guests ?? 0)) : 1
-          await q(`INSERT INTO crm.booking_items (booking_id, line_type, description, qty, unit_price, sort_order) VALUES ($1,'package',$2,$3,$4,50)`,
-            [id, `${p.name} package` + (p.price_basis === 'per_person' ? ` (${qty} guests)` : '') + (p.inclusions?.length ? ` — includes: ${p.inclusions.join(', ')}` : ''), qty, p.price], db)
+          await q(`INSERT INTO crm.booking_items (booking_id, line_type, description, qty, unit_price, sort_order, package_id) VALUES ($1,'package',$2,$3,$4,50,$5)`,
+            [id, `${p.name} package` + (p.price_basis === 'per_person' ? ` (${qty} guests)` : '') + (p.inclusions?.length ? ` — includes: ${p.inclusions.join(', ')}` : ''), qty, p.price, input.packageId], db)
         }
       }
       await recalcBooking(id, db)
@@ -227,7 +227,7 @@ export async function setBookingStatus(id: string, to: string, userId?: string |
   await tx((db) => setBookingStatusInTx(db, id, to, userId, reason))
 }
 
-export async function addBookingItem(bookingId: string, item: { lineType: 'space' | 'food' | 'extra'; spaceId?: string | null; description: string; qty: number; unitPrice: number; start?: Date | null; end?: Date | null }, userId?: string | null) {
+export async function addBookingItem(bookingId: string, item: { lineType: 'space' | 'food' | 'extra'; spaceId?: string | null; description: string; qty: number; unitPrice: number; start?: Date | null; end?: Date | null; packageId?: string | null; addonId?: string | null }, userId?: string | null) {
   await tx(async (db) => {
     const b = await q1<{ status: string; customer_id: string; ref: string }>(`SELECT status, customer_id, ref FROM crm.bookings WHERE id = $1 FOR UPDATE`, [bookingId], db)
     if (!b) throw new Error('Booking not found.')
@@ -243,12 +243,13 @@ export async function addBookingItem(bookingId: string, item: { lineType: 'space
       if ((sp.min_price !== null && item.unitPrice < Number(sp.min_price)) || (sp.max_price !== null && item.unitPrice > Number(sp.max_price)))
         throw new Error(`₹${item.unitPrice} is outside the allowed range for ${sp.name} (₹${Number(sp.min_price ?? 0)} – ₹${Number(sp.max_price ?? 0)}).`)
     }
+    if (item.packageId || item.addonId) await guardDoubleCharge(db, bookingId, item.packageId ?? null, item.addonId ?? null)
     await q(`SAVEPOINT add_item`, [], db)
     try {
       await q(
-        `INSERT INTO crm.booking_items (booking_id, line_type, space_id, description, start_at, end_at, qty, unit_price, sort_order)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,(SELECT COALESCE(max(sort_order),0)+1 FROM crm.booking_items WHERE booking_id=$1))`,
-        [bookingId, item.lineType, item.spaceId ?? null, item.description.trim(), item.start ?? null, item.end ?? null, item.qty, item.unitPrice], db)
+        `INSERT INTO crm.booking_items (booking_id, line_type, space_id, description, start_at, end_at, qty, unit_price, sort_order, package_id, addon_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,(SELECT COALESCE(max(sort_order),0)+1 FROM crm.booking_items WHERE booking_id=$1),$9,$10)`,
+        [bookingId, item.lineType, item.spaceId ?? null, item.description.trim(), item.start ?? null, item.end ?? null, item.qty, item.unitPrice, item.packageId ?? null, item.addonId ?? null], db)
     } catch (e) {
       if (isPgError(e, '23P01')) {
         await q(`ROLLBACK TO SAVEPOINT add_item`, [], db)
@@ -350,4 +351,34 @@ export function occupiesDate(e: { kind: string; start_at: string | Date; end_at:
   const s = istDate(new Date(e.start_at)), en = istDate(new Date(e.end_at))
   if (e.kind === 'room') return s === en ? d === s : d >= s && d < en
   return new Date(e.start_at) < istToDate(addDays(d, 1), '00:00') && new Date(e.end_at) > istToDate(d, '00:00')
+}
+
+/** Refuses catalogue lines that would charge for something already on the booking (same item twice, food or decoration a package already includes). */
+async function guardDoubleCharge(db: Db, bookingId: string, packageId: string | null, addonId: string | null) {
+  const onBooking = await q<{ package_id: string | null; addon_id: string | null; name: string | null; kind: string | null; food_type: string | null }>(
+    `SELECT i.package_id, i.addon_id, COALESCE(p.name, a.name) AS name, p.kind, p.food_type
+       FROM crm.booking_items i LEFT JOIN crm.packages p ON p.id = i.package_id LEFT JOIN crm.addons a ON a.id = i.addon_id
+      WHERE i.booking_id = $1 AND (i.package_id IS NOT NULL OR i.addon_id IS NOT NULL)`, [bookingId], db)
+  const eventPkgs = onBooking.filter((r) => r.package_id && r.kind === 'event')
+  if (packageId) {
+    const p = await q1<{ name: string; kind: string; food_type: string | null }>(`SELECT name, kind, food_type FROM crm.packages WHERE id = $1`, [packageId], db)
+    if (!p) throw new Error('Package not found.')
+    if (onBooking.some((r) => r.package_id === packageId)) throw new Error(`${p.name} is already on this booking. Remove it first to change it.`)
+    if (p.kind === 'food') {
+      const inc = eventPkgs.find((r) => r.food_type)
+      if (inc) throw new Error(`${inc.name} already includes the food, so ${p.name} would be charged twice.`)
+    }
+    if (p.kind === 'event') {
+      if (p.food_type) { const food = onBooking.find((r) => r.package_id && r.kind === 'food'); if (food) throw new Error(`${p.name} already includes food. Remove ${food.name} from the booking first.`) }
+      const linked = await q<{ name: string }>(`SELECT a.name FROM crm.booking_items i JOIN crm.addons a ON a.id = i.addon_id WHERE i.booking_id = $1 AND a.package_id = $2`, [bookingId, packageId], db)
+      if (linked.length) throw new Error(`${p.name} already includes ${linked.map((l) => l.name).join(', ')}. Remove ${linked.length > 1 ? 'those' : 'it'} from the booking first.`)
+    }
+  }
+  if (addonId) {
+    const a = await q1<{ name: string; package_id: string | null; category: string }>(`SELECT name, package_id, category FROM crm.addons WHERE id = $1`, [addonId], db)
+    if (!a) throw new Error('Add-on not found.')
+    if (onBooking.some((r) => r.addon_id === addonId)) throw new Error(`${a.name} is already on this booking. Remove it first to change it.`)
+    const inc = a.package_id && (onBooking.find((r) => r.package_id === a.package_id) ?? (await q1<{ name: string }>(`SELECT pk.name FROM crm.bookings b JOIN crm.packages pk ON pk.id = b.package_id WHERE b.id = $1 AND b.package_id = $2`, [bookingId, a.package_id], db)))
+    if (inc) throw new Error(`${a.name} is already included in ${inc.name}.`)
+  }
 }

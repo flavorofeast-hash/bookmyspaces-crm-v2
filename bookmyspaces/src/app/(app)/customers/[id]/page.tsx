@@ -109,7 +109,8 @@ export default async function CustomerPage(props: { params: Promise<{ id: string
               <Hidden name="customer_id" value={c.id} /><Hidden name="back" value={back} />
               <div className="grid grid-cols-2 gap-2">
                 <input type="date" name="due_on" required defaultValue={addDays(istDate(), 1)} className="input" />
-                <SubmitButton className="btn-secondary">Add</SubmitButton>
+                <select name="method" defaultValue="call" className="input" aria-label="How"><option value="call">Call</option><option value="whatsapp">WhatsApp</option><option value="visit">Visit</option><option value="email">Email</option></select>
+                <SubmitButton className="btn-secondary col-span-2">Add</SubmitButton>
               </div>
               <input name="note" required placeholder="What to do, e.g. Send revised quote" className="input" />
             </form>

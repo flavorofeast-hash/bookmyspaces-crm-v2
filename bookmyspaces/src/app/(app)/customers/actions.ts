@@ -27,7 +27,7 @@ export async function updateCustomerAction(f: FormData) {
 export async function addFollowUpAction(f: FormData) {
   const u = await requireUser()
   const id = str(f, 'customer_id')
-  await run(safeBack(f, `/customers/${id}`), 'Follow-up added.', async () => { await addFollowUp(id, str(f, 'due_on'), str(f, 'note'), u.id, str(f, 'booking_id') || null) })
+  await run(safeBack(f, `/customers/${id}`), 'Follow-up added.', async () => { await addFollowUp(id, str(f, 'due_on'), str(f, 'note'), u.id, str(f, 'booking_id') || null, str(f, 'method') || null) })
 }
 
 export async function completeFollowUpAction(f: FormData) {

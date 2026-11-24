@@ -101,13 +101,14 @@ export async function getCustomer(id: string) {
      FROM crm.customers c LEFT JOIN crm.campaigns cp ON cp.id = c.campaign_id WHERE c.id = $1`, [id])
 }
 
-export async function addFollowUp(customerId: string, dueOn: string, note: string, userId?: string | null, bookingId?: string | null) {
+export async function addFollowUp(customerId: string, dueOn: string, note: string, userId?: string | null, bookingId?: string | null, method?: string | null) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dueOn)) throw new Error('Choose a follow-up date.')
   if (!note.trim()) throw new Error('Write what the follow-up is about.')
   await tx(async (db) => {
-    await q(`INSERT INTO crm.follow_ups (customer_id, booking_id, due_on, note, created_by) VALUES ($1,$2,$3,$4,$5)`,
-      [customerId, bookingId ?? null, dueOn, note.trim(), userId ?? null], db)
-    await logActivity({ userId, customerId, bookingId, action: 'follow_up_added', detail: `${dueOn}: ${note.trim()}` }, db)
+    const m = method && ['call', 'whatsapp', 'visit', 'email'].includes(method) ? method : null
+    await q(`INSERT INTO crm.follow_ups (customer_id, booking_id, due_on, note, created_by, method) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [customerId, bookingId ?? null, dueOn, note.trim(), userId ?? null, m], db)
+    await logActivity({ userId, customerId, bookingId, action: 'follow_up_added', detail: `${dueOn}${m ? ` (${m})` : ''}: ${note.trim()}` }, db)
   })
 }
 
