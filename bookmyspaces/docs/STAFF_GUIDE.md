@@ -18,13 +18,13 @@ On the customer page → **+ New booking / enquiry** → choose the type (event,
 On the new-booking page after **Check availability**: *Free* can be booked; *Booked* (greyed out) is taken; *Not configured* means the owner has not set a rate yet. The **Today** calendar shows every booking by month or week (filter by property or room).
 
 ## 6. Create (confirm) a booking
-On the booking page → **Record payment** with *Also confirm the booking* ticked, or **Confirm booking**. The CRM never lets two people confirm the same room/space for the same time.
+On the booking page → **Record payment** with *Also confirm the booking* ticked, or **Confirm booking**. The CRM never lets two people confirm the same room/space for the same time, and a booking needs at least one room or space before it can be confirmed.
 
 ## 7. Prepare a quotation
 Booking page → set **Guests** (Details card) → add items (step 8) → set **Discount** if approved → **Issue quotation**. Send it with **WhatsApp** or the customer link. Once issued, a quotation never changes; after changes, issue a revised quotation.
 
 ## 8. Add food, packages and decoration
-Booking page → **Add package, food or add-on** → choose the item → (for decoration with a price range, type the agreed price) → **Add to booking**. Per-guest menus use the guest count (and the menu's minimum guests). A package line lists what it already includes — don't add those items again. Only items the owner has **Approved** appear here (see **Packages & Food**).
+Booking page → **Add package, food or add-on** → choose the item → (for decoration with a price range, type the agreed price) → **Add to booking**. Per-guest menus use the guest count (and the menu's minimum guests). A package line lists what it already includes. The CRM refuses anything that would be charged twice: the same item twice, a food menu when the event package already includes food, or an add-on that is part of the chosen package. For **extra guests**, leave the quantity empty: it is worked out from the guest count above the package limit (e.g. 25 guests on a 20-guest package = 5 extra). Only items the owner has **Approved** appear here (see **Packages & Food**).
 
 ## 9. Collect an advance
 Booking page → **Record payment** → kind *Advance*, amount, method (cash/UPI/…) → **Record payment & issue receipt**.
@@ -42,13 +42,13 @@ Booking page → **Cancel booking** → type the reason → confirm. If money wa
 **Today → Booking calendar**: ← / → / **Today**, **Month** or **Week**, filter by property or room. Green = confirmed, dashed amber with "?" = enquiry/quotation, grey = completed. Click a booking to open it; click a date to start a new booking on that date.
 
 ## 14. Update rates
-**Rates** → type the standard rate and any weekday rates → **Save**; add date-specific rates below. You can only use prices inside the owner's range. Every change is recorded with your name.
+**Rates** → type the standard rate and any weekday rates → **Save**; add date-specific rates below. You can only use prices inside the owner's range. To set many rooms at once use **Set for a whole group** at the top of each property (choose the group, e.g. AC rooms, type Standard/Saturday/Sunday → **Apply to group**; empty boxes are left unchanged). If any price is outside the range, nothing is saved. Every change is recorded with your name.
 
 ## 15. Assign work
 Booking page → Details → **Assigned to** → choose the person → **Save details**. The bookings list and Today show who is handling what.
 
 ## 16. Follow up with customers
-Customer or booking page → **Add follow-up** (date + note). **Today** lists follow-ups due (overdue in red) and **Quotations awaiting reply** with **Call** and **WhatsApp** buttons. Click **Done** after the call.
+Customer or booking page → **Add follow-up** (date, how — Call/WhatsApp/Visit/Email — and a note). **Today** lists follow-ups due (overdue in red) and **Quotations awaiting reply** with **Call** and **WhatsApp** buttons. Click **Done** after the call.
 
 ---
 

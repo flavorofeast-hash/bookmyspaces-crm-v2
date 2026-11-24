@@ -206,6 +206,8 @@ export async function setBookingStatusInTx(db: Db, id: string, to: string, userI
   if (b.status === to) return
   if (!TRANSITIONS[b.status]?.includes(to)) throw new Error(`A ${b.status} booking cannot be changed to ${to}.`)
   if (to === 'cancelled' && !reason?.trim()) throw new Error('Please give a reason for cancelling.')
+  if (to === 'confirmed' && !(await q1(`SELECT 1 FROM crm.booking_items WHERE booking_id = $1 AND space_id IS NOT NULL LIMIT 1`, [id], db)))
+    throw new Error('Add at least one room or space before confirming.')
   await q(`SAVEPOINT status_change`, [], db)
   try {
     await q(

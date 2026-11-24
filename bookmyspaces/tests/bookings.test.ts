@@ -63,6 +63,13 @@ describe('bookings', () => {
     expect(av2.find((s) => s.id === S.rooftop)!.status).toBe('tentative')
   })
 
+  it('refuses to confirm a booking with no room or space', async () => {
+    const e = event([], '2027-03-01', '16:00', '23:00')
+    await expect(createBooking({ customerId: c2, bookingType: 'event', event: e, start: e.start, end: e.end, confirm: true })).rejects.toThrow(/at least one room or space/)
+    const n = await q1<{ n: number }>(`SELECT count(*)::int AS n FROM crm.bookings WHERE start_at = $1`, [e.start])
+    expect(n!.n).toBe(0)
+  })
+
   it('refuses to confirm an overlapping booking for the same hall', async () => {
     const e = event([S.hall], '2026-12-20', '18:00', '22:00')
     await expect(createBooking({ customerId: c2, bookingType: 'event', event: e, start: e.start, end: e.end, confirm: true })).rejects.toBeInstanceOf(BookingConflictError)
