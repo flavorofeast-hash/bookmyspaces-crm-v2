@@ -28,6 +28,8 @@ export default async function TodayPage(props: { searchParams: Promise<{ ok?: st
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card title="Booking calendar" className="lg:col-span-2"><BookingCalendar sp={searchParams} /></Card>
+
         <Card title={`Follow-ups due (${d.followUps.length})`}>
           {d.followUps.length === 0 ? <Empty>Nothing due. </Empty> : (
             <ul className="divide-y divide-slate-100">{d.followUps.map((f) => (

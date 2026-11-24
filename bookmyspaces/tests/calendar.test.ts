@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { readFileSync } from 'node:fs'
 import { resetDb, closePool, seedSpaces, newCustomer, ist } from './helpers'
 import { createBooking, setBookingStatus, dashboardCalendar, occupiesDate } from '@/lib/bookings'
 
@@ -68,5 +69,25 @@ describe('dashboard calendar', () => {
     expect(one.length).toBeGreaterThan(0)
     expect(one.every((r) => r.space_id === S.room101)).toBe(true)
     expect(await dashboardCalendar(ist('2027-03-01', '00:00'), ist('2027-03-31', '00:00'))).toHaveLength(0) // only the displayed range is loaded
+  })
+})
+
+describe('dashboard calendar page', () => {
+  it('9-10. renders month and week views with links to booking details, filters and mobile-safe grid', async () => {
+    const { renderToStaticMarkup } = await import('react-dom/server')
+    const { BookingCalendar } = await import('@/components/booking-calendar')
+    const m = renderToStaticMarkup(await BookingCalendar({ sp: { cal: '2027-02' } }))
+    expect(m).toContain('February 2027')
+    expect(m).toMatch(/href="\/bookings\/[0-9a-f-]{36}"/)
+    expect(m).toContain('Celebration Hall')
+    expect(m).toContain('/bookings/new?event_date=2027-02-10')
+    expect(m).toContain('grid-cols-7')
+    expect(m).toContain('min-w-0')
+    const w = renderToStaticMarkup(await BookingCalendar({ sp: { cal: '2027-02-10', cv: 'week' } }))
+    expect(w).toContain('Week of')
+    const f = renderToStaticMarkup(await BookingCalendar({ sp: { cal: '2027-02', cp: S.p2 } }))
+    expect(f).not.toContain('Celebration Hall · ')
+    expect(f).toContain('Rooftop Terrace')
+    expect(readFileSync('src/app/(app)/today/page.tsx', 'utf8')).toMatch(/<BookingCalendar sp=\{searchParams\} \/>/)
   })
 })
