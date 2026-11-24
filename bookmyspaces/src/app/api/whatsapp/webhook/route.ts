@@ -1,11 +1,12 @@
 import { metaEnv } from '@/lib/env'
 import { NextResponse } from 'next/server'
 import { timingSafeEqual } from 'crypto'
-import { verifySignature, processWebhook } from '@/lib/whatsapp'
+import { verifySignature, processWebhook, logWebhookError } from '@/lib/whatsapp'
 import { isDbConfigured } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+export const maxDuration = 30 // AI replies are generated inside the webhook, as on V3
 
 // Meta's one-time verification handshake.
 export async function GET(req: Request) {
@@ -27,10 +28,12 @@ export async function POST(req: Request) {
   try { payload = JSON.parse(raw) } catch { return new NextResponse('Bad request', { status: 400 }) }
   try {
     const r = await processWebhook(payload)
-    if (r.errors.length) console.error('[whatsapp webhook] errors:', r.errors)
+    if (r.errors.length) { console.error('[whatsapp webhook] errors:', r.errors); await logWebhookError(payload, r.errors.join('; ')) }
   } catch (e) {
     // Log and still acknowledge, so Meta does not keep retrying a broken payload forever.
+    // The payload is kept in crm.wa_webhook_errors and can be re-run from Settings → Connections.
     console.error('[whatsapp webhook] failed:', e)
+    await logWebhookError(payload, (e as Error).message ?? String(e))
   }
   return NextResponse.json({ ok: true })
 }

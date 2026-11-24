@@ -10,6 +10,14 @@ http.createServer((req, res) => {
   req.on('end', () => {
     fs.appendFileSync(log, JSON.stringify({ method: req.method, url: req.url, body: body.slice(0, 500) }) + '\n')
     const json = (code, obj) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(obj)) }
+    if (req.url === '/v1/messages') { // stand-in for api.anthropic.com (ANTHROPIC_BASE_URL)
+      const b = JSON.parse(body || '{}'); const last = b.messages?.at(-1)?.content ?? ''
+      const facts = (b.system ?? '').includes('BUSINESS FACTS')
+      return json(200, { content: [{ type: 'text', text: /book|date|available/i.test(last) ? 'Thank you! Our team will check availability and reply shortly.\n<<HANDOVER: availability request>>' : `Hello! (mock AI, approved facts ${facts ? 'received' : 'missing'}) How many guests are you expecting?` }] })
+    }
+    if (/\/MEDIAIN\d*$/.test(req.url)) return json(200, { url: 'http://localhost:4010/download/photo.jpg', mime_type: 'image/jpeg' })
+    if (req.url === '/download/photo.jpg') { res.writeHead(200, { 'content-type': 'image/jpeg' }); return res.end(Buffer.from([0xff, 0xd8, 0xff, 0xd9])) }
+    if (req.url.endsWith('/media')) return json(200, { id: 'MEDIAUP' + ++n })
     if (req.url.includes('/messages')) {
       if (body.includes('919999900000')) return json(400, { error: { message: '(#131030) Recipient phone number not in allowed list', code: 131030 } })
       return json(200, { messages: [{ id: 'wamid.MOCK' + ++n }] })

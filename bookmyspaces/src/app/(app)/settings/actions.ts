@@ -7,6 +7,7 @@ import { importLegacyLeads } from '@/lib/customers'
 import { run, str } from '@/lib/action'
 import { q } from '@/lib/db'
 import { logActivity } from '@/lib/activity'
+import { reprocessWebhookError } from '@/lib/whatsapp'
 
 /** Records who changed which setting (never passwords). */
 async function audit(u: { id: string }, what: string, f?: FormData) {
@@ -68,5 +69,22 @@ export async function importLeadsAction() {
     const r = await importLegacyLeads(u.id)
     msg = `Found ${r.found} old leads: ${r.created} new customers, ${r.merged} merged into existing customers (same mobile), ${r.skipped} already imported, ${r.noPhone} without a mobile number (kept and flagged).`
     return `${B}?import=${encodeURIComponent(msg)}#import`
+  })
+}
+
+export async function setAiReplyAction(f: FormData) {
+  const u = await requireOwner()
+  const on = str(f, 'on') === '1'
+  await run(B + '#connections', on ? 'AI WhatsApp replies switched on.' : 'AI WhatsApp replies switched off.', async () => {
+    await q(`UPDATE crm.business_settings SET ai_reply_enabled = $1 WHERE id = 1`, [on])
+    await audit(u, on ? 'AI WhatsApp replies switched on' : 'AI WhatsApp replies switched off')
+  })
+}
+
+export async function retryWebhookErrorAction(f: FormData) {
+  const u = await requireOwner()
+  await run(B + '#connections', 'Webhook delivery processed again.', async () => {
+    const errs = await reprocessWebhookError(Number(str(f, 'id')), u.id)
+    if (errs.length) throw new Error(`Still failing: ${errs.join('; ').slice(0, 300)}`)
   })
 }

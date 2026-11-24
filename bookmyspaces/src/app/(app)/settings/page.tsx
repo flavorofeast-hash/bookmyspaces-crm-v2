@@ -47,6 +47,10 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
   const legacyCount = legacy?.has_table ? (await q1<{ n: number }>(`SELECT count(*)::int AS n FROM public.leads`))!.n : 0
   const imported = (await q1<{ n: number }>(`SELECT count(*)::int AS n FROM (SELECT unnest(legacy_lead_ids) FROM crm.customers) x`))!.n
   const wa = waStatus()
+  const [aiRow, hookErrors] = await Promise.all([
+    q1<{ ai_reply_enabled: boolean }>(`SELECT ai_reply_enabled FROM crm.business_settings WHERE id = 1`),
+    q<any>(`SELECT id, at, error FROM crm.wa_webhook_errors WHERE resolved_at IS NULL ORDER BY at DESC LIMIT 10`),
+  ])
   const env = (k: string) => Boolean(k === 'APP_PUBLIC_URL' ? appPublicUrl() : metaEnv(k))
   return (
     <>
@@ -252,11 +256,25 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
               ['Facebook publishing', env('META_PAGE_ID') && env('META_PAGE_ACCESS_TOKEN'), 'Needs META_PAGE_ID and META_PAGE_ACCESS_TOKEN (connection is checked live on each post)'],
               ['Instagram publishing', env('INSTAGRAM_BUSINESS_ACCOUNT_ID') && env('META_PAGE_ACCESS_TOKEN') && env('APP_PUBLIC_URL'), 'Needs INSTAGRAM_BUSINESS_ACCOUNT_ID, META_PAGE_ACCESS_TOKEN and APP_PUBLIC_URL'],
               ['Customer document links', env('APP_PUBLIC_URL'), 'Needs APP_PUBLIC_URL (this site’s address)'],
+              ['AI replies (Claude / OpenAI)', env('ANTHROPIC_API_KEY') || env('OPENAI_API_KEY'), 'Needs ANTHROPIC_API_KEY (optional ANTHROPIC_MODEL, OPENAI_API_KEY as backup)'],
               ['Google Business', false, 'Manual posting (API access must be approved by Google first)'],
             ].map(([label, ok, need]) => (
               <div key={label as string} className="flex items-start gap-2"><Badge value={ok ? 'confirmed' : 'tentative'} label={ok ? 'Set' : 'Not set'} /><span><b>{label as string}</b>{!ok && <span className="muted"> — {need as string}</span>}</span></div>
             ))}
             <p className="text-xs muted">Secret values are entered in Vercel (Project → Settings → Environment Variables), never in this screen.</p>
+          </div>
+          <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+            <div className="font-medium text-sm">AI replies on WhatsApp</div>
+            <p className="text-xs muted">Same as the old CRM: the AI answers new WhatsApp messages and hands the chat to staff when it is unsure, when the customer asks for a person, complains, mentions refunds or payments, or wants dates confirmed. It only uses approved rates, packages and property details, never confirms availability, and any reply with an unapproved price is blocked. Needs ANTHROPIC_API_KEY (or OPENAI_API_KEY) in Vercel — the same keys the old CRM uses.</p>
+            <div className="flex items-center gap-2"><Badge value={aiRow?.ai_reply_enabled ? 'confirmed' : 'tentative'} label={aiRow?.ai_reply_enabled ? 'On' : 'Off'} />
+              <span className="text-xs">{env('ANTHROPIC_API_KEY') ? 'Claude key set' : env('OPENAI_API_KEY') ? 'OpenAI key set' : 'No AI key set yet'}{!wa.canSend ? ' · WhatsApp sending not connected yet' : ''}</span>
+              <form action={A.setAiReplyAction}><Hidden name="on" value={aiRow?.ai_reply_enabled ? '0' : '1'} /><SubmitButton className="btn-secondary btn-sm">{aiRow?.ai_reply_enabled ? 'Switch off' : 'Switch on'}</SubmitButton></form></div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-slate-100">
+            <div className="font-medium text-sm">WhatsApp deliveries that failed to process</div>
+            {hookErrors.length === 0 ? <p className="text-xs muted">None.</p> : <ul className="text-xs space-y-1 mt-1">{hookErrors.map((e) => (
+              <li key={e.id} className="flex items-center gap-2"><span className="muted">{fmtDateTime(e.at)}</span><span className="flex-1 truncate">{e.error}</span>
+                <form action={A.retryWebhookErrorAction}><Hidden name="id" value={e.id} /><SubmitButton className="btn-secondary btn-sm">Retry</SubmitButton></form></li>))}</ul>}
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100">
             <div className="font-medium text-sm">Test an incoming WhatsApp enquiry</div>
@@ -265,6 +283,7 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
               <Field label="Customer name"><input name="name" defaultValue="ZZ TEST " className="input" required /></Field>
               <Field label="Mobile"><input name="phone" className="input" required /></Field>
               <Field label="Message" className="sm:col-span-3"><input name="text" className="input" placeholder="Hi! I saw your post (CODE). Please share details." required /></Field>
+              <label className="sm:col-span-3 flex items-center gap-2 text-xs"><input type="checkbox" name="allow_ai" /> Also let the AI reply — sends a REAL WhatsApp message to this number (use your own phone; it must have messaged the business number in the last 24 hours)</label>
               <SubmitButton className="btn-secondary">Run test message</SubmitButton>
             </form>
           </div>

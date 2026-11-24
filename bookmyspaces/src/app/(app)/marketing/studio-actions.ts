@@ -105,7 +105,7 @@ export async function saveOpportunityAction(f: FormData) {
 export async function simulateInboundAction(f: FormData) {
   const u = await requireOwner()
   await run('/settings#connections', 'Test message processed.', async () => {
-    const r = await simulateInbound(str(f, 'phone'), str(f, 'name'), str(f, 'text'), u.id)
+    const r = await simulateInbound(str(f, 'phone'), str(f, 'name'), str(f, 'text'), u.id, { allowAi: f.get('allow_ai') === 'on' })
     return `/inbox/${r.customerId}`
   })
 }
