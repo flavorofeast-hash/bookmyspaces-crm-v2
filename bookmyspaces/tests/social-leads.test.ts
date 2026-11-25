@@ -145,3 +145,24 @@ describe('follow-up and conversion', () => {
     expect(after.notes).toMatch(/Called, will confirm/)
   })
 })
+
+describe('Instagram API with Instagram login', () => {
+  it('webhook signed with the Instagram app secret is accepted for Instagram only; replies go to graph.instagram.com', async () => {
+    const { POST } = await import('@/app/api/whatsapp/webhook/route')
+    const { createHmac } = await import('crypto')
+    process.env.META_IG_LOGIN_APP_SECRET = 'igsecret'; process.env.META_IG_ACCESS_TOKEN = 'ig-token'; process.env.META_IG_ID = 'IGME'
+    process.env.META_IG_GRAPH_BASE = 'https://ig.test/v25.0'
+    const call = (payload: any, secret: string) => { const raw = JSON.stringify(payload); return POST(new Request('http://x/api/meta/webhook', { method: 'POST', body: raw, headers: { 'x-hub-signature-256': 'sha256=' + createHmac('sha256', secret).update(raw).digest('hex') } })) }
+    mockGraph((url) => url.startsWith('https://ig.test') && url.includes('IGSID77') ? { name: 'Puja Roy', username: 'puja.r' } : { recipient_id: 'IGSID77', message_id: 'ig_out1' })
+    const ev = { object: 'instagram', entry: [{ id: 'IGME', time: now(), messaging: [{ sender: { id: 'IGSID77' }, recipient: { id: 'IGME' }, timestamp: now(), message: { mid: 'ig_login_1', text: 'Skyline room 2 nights?' } }] }] }
+    expect((await call(ev, 'igsecret')).status).toBe(200)
+    expect((await call({ object: 'page', entry: [] }, 'igsecret')).status).toBe(401) // IG secret cannot sign Page/WhatsApp events
+    expect((await call(ev, 'wrong')).status).toBe(401)
+    const c = (await q1<any>(`SELECT id, name, ig_username FROM crm.customers WHERE ig_sid = 'IGSID77'`))!
+    expect(c).toMatchObject({ name: 'Puja Roy', ig_username: 'puja.r' })
+    const r = await sendSocialText(c.id, 'instagram', 'Yes, sharing rates', owner)
+    expect(r.ok).toBe(true)
+    expect(calls.at(-1)!.url).toBe('https://ig.test/v25.0/IGME/messages')
+    expect(calls.at(-1)!.init.headers.Authorization).toBe('Bearer ig-token')
+  })
+})

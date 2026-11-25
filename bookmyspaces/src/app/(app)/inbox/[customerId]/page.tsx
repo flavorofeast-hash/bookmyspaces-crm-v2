@@ -68,7 +68,7 @@ export default async function ThreadPage(props: { params: Promise<{ customerId: 
 
       {social ? (
         <Card title={`Reply on ${chName}`} className="mt-4">
-          {!socialStatus().canSend ? <p className="text-sm">Replies from the CRM open once the Facebook Page token is added in Vercel. Until then, reply from Meta Business Suite — those replies still appear here.</p>
+          {!(channel === 'facebook' ? socialStatus().canSendFacebook : socialStatus().canSendInstagram) ? <p className="text-sm">Replies from the CRM open once the Facebook Page token is added in Vercel. Until then, reply from Meta Business Suite — those replies still appear here.</p>
             : sWin?.open ? (
             <form action={sendReplyAction} className="space-y-2">
               <Hidden name="customer_id" value={c.id} /><Hidden name="channel" value={channel} />

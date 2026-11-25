@@ -10,7 +10,20 @@ type Channel = 'facebook' | 'instagram'
 /** Facebook Page / Instagram settings (Vercel env). The app secret and verify token are shared with WhatsApp (same Meta app). */
 export function socialStatus() {
   const token = Boolean(metaEnv('META_PAGE_ACCESS_TOKEN'))
-  return { pageId: metaEnv('META_PAGE_ID') ?? null, igId: metaEnv('INSTAGRAM_BUSINESS_ACCOUNT_ID') ?? null, canFetch: token, canSend: token && Boolean(metaEnv('META_PAGE_ID')) }
+  const igLogin = Boolean(metaEnv('META_IG_ACCESS_TOKEN'))
+  const page = token && Boolean(metaEnv('META_PAGE_ID'))
+  return { pageId: metaEnv('META_PAGE_ID') ?? null, igId: metaEnv('META_IG_ID') ?? metaEnv('INSTAGRAM_BUSINESS_ACCOUNT_ID') ?? null, igLogin, canFetch: token, canSend: page || igLogin, canSendFacebook: page, canSendInstagram: igLogin || page }
+}
+
+/** Instagram API with Instagram login (graph.instagram.com, Instagram user token). */
+async function igGraph(path: string, init: RequestInit = {}): Promise<any> {
+  const token = metaEnv('META_IG_ACCESS_TOKEN')
+  if (!token) throw new Error('Instagram is not connected (META_IG_ACCESS_TOKEN missing).')
+  const base = (metaEnv('META_IG_GRAPH_BASE') ?? 'https://graph.instagram.com/v25.0').replace(/\/$/, '')
+  const res = await fetch(`${base}/${path}`, { ...init, headers: { Authorization: `Bearer ${token}`, ...(init.body ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(15_000) })
+  const j: any = await res.json().catch(() => ({}))
+  if (!res.ok || j?.error) { const e = j?.error ?? {}; const err: any = new Error(e.message || `Instagram returned HTTP ${res.status}`); err.code = String(e.code ?? res.status); throw err }
+  return j
 }
 
 async function graph(path: string, init: RequestInit = {}): Promise<any> {
@@ -25,7 +38,8 @@ async function graph(path: string, init: RequestInit = {}): Promise<any> {
 /** Customer's public name, if Meta allows it. Never guessed. */
 async function profile(channel: Channel, sid: string): Promise<{ name: string | null; username: string | null }> {
   try {
-    const j = await graph(`${encodeURIComponent(sid)}?fields=${channel === 'instagram' ? 'name,username' : 'first_name,last_name,name'}`)
+    const j = channel === 'instagram' && metaEnv('META_IG_ACCESS_TOKEN') ? await igGraph(`${encodeURIComponent(sid)}?fields=name,username`)
+      : await graph(`${encodeURIComponent(sid)}?fields=${channel === 'instagram' ? 'name,username' : 'first_name,last_name,name'}`)
     return { name: (j.name || [j.first_name, j.last_name].filter(Boolean).join(' ') || null), username: j.username ?? null }
   } catch { return { name: null, username: null } }
 }
@@ -185,7 +199,8 @@ export async function replyChannel(customerId: string): Promise<'whatsapp' | Cha
 export async function sendSocialText(customerId: string, channel: Channel, body: string, userId: string) {
   const text = body.trim()
   if (!text) throw new Error('Type a message first.')
-  if (!socialStatus().canSend) throw new Error('Facebook/Instagram replies are not connected yet (META_PAGE_ID / META_PAGE_ACCESS_TOKEN missing).')
+  const st = socialStatus()
+  if (!(channel === 'facebook' ? st.canSendFacebook : st.canSendInstagram)) throw new Error(channel === 'facebook' ? 'Messenger replies are not connected yet (META_PAGE_ID / META_PAGE_ACCESS_TOKEN missing).' : 'Instagram replies are not connected yet (META_IG_ACCESS_TOKEN missing).')
   const w = await socialWindow(customerId, channel)
   if (!w.open) throw new Error(`More than 24 hours since the customer last wrote. ${channel === 'facebook' ? 'Messenger' : 'Instagram'} does not allow a reply from here now.`)
   const c = await q1<{ fb_psid: string | null; ig_sid: string | null }>(`SELECT fb_psid, ig_sid FROM crm.customers WHERE id = $1`, [customerId])
@@ -193,7 +208,9 @@ export async function sendSocialText(customerId: string, channel: Channel, body:
   if (!to) throw new Error('No conversation id for this customer.')
   const id = (await q1<{ id: string }>(`INSERT INTO crm.messages (customer_id, direction, channel, msg_type, body, status, sent_by) VALUES ($1,'out',$2,'text',$3,'sending',$4) RETURNING id`, [customerId, channel, text, userId]))!.id
   try {
-    const j = await graph(`${encodeURIComponent(metaEnv('META_PAGE_ID')!)}/messages`, { method: 'POST', body: JSON.stringify({ recipient: { id: to }, messaging_type: 'RESPONSE', message: { text } }) })
+    const body = JSON.stringify({ recipient: { id: to }, messaging_type: 'RESPONSE', message: { text } })
+    const j = channel === 'instagram' && st.igLogin ? await igGraph(`${encodeURIComponent(metaEnv('META_IG_ID') ?? 'me')}/messages`, { method: 'POST', body })
+      : await graph(`${encodeURIComponent(metaEnv('META_PAGE_ID')!)}/messages`, { method: 'POST', body })
     await q(`UPDATE crm.messages SET status = 'sent', wa_message_id = $2, status_updated_at = now() WHERE id = $1`, [id, j.message_id ?? null])
     await q(`UPDATE crm.leads SET last_contact_at = now(), status = CASE WHEN status = 'new' THEN 'contacted' ELSE status END, updated_at = now() WHERE customer_id = $1 AND source = $2 AND status NOT IN ('converted','lost')`, [customerId, channel])
     await logActivity({ userId, customerId, action: `${channel}_out`, detail: text.slice(0, 140) })
