@@ -226,6 +226,17 @@ export async function sendSocialText(customerId: string, channel: Channel, body:
   }
 }
 
+/** Read-only owner check: the Page token can read the configured Page, and which fields this app receives for it. */
+export async function checkPage(): Promise<string> {
+  const s = socialStatus()
+  if (!s.pageId || !s.canFetch) throw new Error('META_PAGE_ID / META_PAGE_ACCESS_TOKEN are not set in Vercel.')
+  const p = await graph(`${encodeURIComponent(s.pageId)}?fields=id,name`)
+  if (String(p.id) !== s.pageId) throw new Error('The Page token belongs to a different Page.')
+  const subs = await graph(`${encodeURIComponent(s.pageId)}/subscribed_apps`).catch(() => null)
+  const fields = (subs?.data ?? []).flatMap((a: any) => a.subscribed_fields ?? [])
+  return `${p.name} (${p.id}) — token OK${fields.length ? `; receiving: ${fields.join(', ')}` : ''}`
+}
+
 /** Owner setup check: subscribes the Page to this app for messages and lead forms (uses the Page token in Vercel). */
 export async function subscribePage(): Promise<string> {
   const s = socialStatus()

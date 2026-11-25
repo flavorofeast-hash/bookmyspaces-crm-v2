@@ -280,8 +280,8 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
             <div className="font-medium text-sm">Facebook & Instagram enquiries</div>
-            <p className="text-xs muted">After the Page token is in Vercel, press this once: it asks Meta to send this Page’s messages and lead-form submissions to the CRM. Safe to press again.</p>
-            <form action={A.subscribePageAction}><SubmitButton className="btn-secondary btn-sm" pendingText="Connecting…">Connect Facebook Page</SubmitButton></form>
+            <p className="text-xs muted">Checks that the Page token in Vercel can read the Page and shows which events Meta sends. Read-only.</p>
+            <form action={A.checkPageAction}><SubmitButton className="btn-secondary btn-sm" pendingText="Checking…">Check Page connection</SubmitButton></form>
             <form action={A.simulateSocialAction} className="grid sm:grid-cols-3 gap-2 items-end">
               <Field label="Channel"><select name="channel" className="input"><option value="facebook">Facebook Messenger</option><option value="instagram">Instagram DM</option></select></Field>
               <Field label="Customer name"><input name="name" defaultValue="ZZ TEST " className="input" required /></Field>

@@ -175,3 +175,14 @@ describe('Page filter', () => {
     expect((await q1<any>(`SELECT count(*)::int n FROM crm.messages`))!.n).toBe(before)
   })
 })
+
+describe('checkPage (read-only)', () => {
+  it('confirms the token reads the configured Page and lists received fields; rejects a token for another Page', async () => {
+    const { checkPage } = await import('@/lib/social')
+    mockGraph((url) => url.includes('/subscribed_apps') ? { data: [{ subscribed_fields: ['messages', 'message_reads'] }] } : { id: 'PAGE1', name: 'Test Page' })
+    expect(await checkPage()).toBe('Test Page (PAGE1) — token OK; receiving: messages, message_reads')
+    expect(calls.every((c) => !c.init?.method || c.init.method === 'GET')).toBe(true)
+    mockGraph(() => ({ id: 'OTHER', name: 'Other' }))
+    await expect(checkPage()).rejects.toThrow(/different Page/)
+  })
+})

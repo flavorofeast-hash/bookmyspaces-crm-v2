@@ -4,11 +4,12 @@ import { requireOwner, setSessionCookie } from '@/lib/auth'
 import { saveSettings, saveProperty, addSpaces, updateSpace, savePackage, saveSlot, createUser, setUserPassword, setUserActive, setUsername, signOutEverywhere, setUserRole } from '@/lib/setup'
 import { q1 } from '@/lib/db'
 import { importLegacyLeads } from '@/lib/customers'
-import { run, str } from '@/lib/action'
+import { run, str, withParam, errorMessage } from '@/lib/action'
+import { redirect } from 'next/navigation'
 import { q } from '@/lib/db'
 import { logActivity } from '@/lib/activity'
 import { reprocessWebhookError } from '@/lib/whatsapp'
-import { subscribePage, simulateSocial } from '@/lib/social'
+import { checkPage, simulateSocial } from '@/lib/social'
 
 /** Records who changed which setting (never passwords). */
 async function audit(u: { id: string }, what: string, f?: FormData) {
@@ -90,13 +91,11 @@ export async function retryWebhookErrorAction(f: FormData) {
   })
 }
 
-export async function subscribePageAction() {
-  const u = await requireOwner()
-  await run(B + '#connections', 'Facebook Page connected to the CRM.', async () => {
-    const r = await subscribePage()
-    await audit(u, 'Facebook Page subscribed to webhooks')
-    return `${B}?ok=${encodeURIComponent('Page subscribed — ' + r)}#connections`
-  })
+export async function checkPageAction() {
+  await requireOwner()
+  let dest: string
+  try { dest = withParam(B + '#connections', 'ok', await checkPage()) } catch (e) { dest = withParam(B + '#connections', 'err', errorMessage(e)) }
+  redirect(dest)
 }
 
 export async function simulateSocialAction(f: FormData) {
