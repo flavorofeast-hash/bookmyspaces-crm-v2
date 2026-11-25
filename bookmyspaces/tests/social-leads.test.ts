@@ -182,6 +182,8 @@ describe('checkPage (read-only)', () => {
     mockGraph((url) => url.includes('/subscribed_apps') ? { data: [{ subscribed_fields: ['messages', 'message_reads'] }] } : { id: 'PAGE1', name: 'Test Page' })
     expect(await checkPage()).toBe('Test Page (PAGE1) — token OK; receiving: messages, message_reads')
     expect(calls.every((c) => !c.init?.method || c.init.method === 'GET')).toBe(true)
+    mockGraph((url) => url.includes('/me?') ? { id: 'PAGE1' } : url.includes('/subscribed_apps') ? { data: [] } : { status: 400, json: { error: { code: 100, message: 'needs pages_read_engagement' } } })
+    expect(await checkPage()).toBe('Page (PAGE1) — token OK')
     mockGraph(() => ({ id: 'OTHER', name: 'Other' }))
     await expect(checkPage()).rejects.toThrow(/different Page/)
   })
