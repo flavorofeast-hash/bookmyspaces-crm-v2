@@ -166,3 +166,12 @@ describe('Instagram API with Instagram login', () => {
     expect(calls.at(-1)!.init.headers.Authorization).toBe('Bearer ig-token')
   })
 })
+
+describe('Page filter', () => {
+  it('ignores Messenger events for any Page other than META_PAGE_ID', async () => {
+    const before = (await q1<any>(`SELECT count(*)::int n FROM crm.messages`))!.n
+    const r = await processWebhook({ object: 'page', entry: [{ id: 'OTHERPAGE', time: now(), messaging: [{ sender: { id: 'PSIDX' }, recipient: { id: 'OTHERPAGE' }, timestamp: now(), message: { mid: 'm_other', text: 'hi' } }] }] })
+    expect(r.errors).toEqual([])
+    expect((await q1<any>(`SELECT count(*)::int n FROM crm.messages`))!.n).toBe(before)
+  })
+})

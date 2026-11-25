@@ -164,7 +164,10 @@ export async function processSocialWebhook(payload: any): Promise<{ messages: nu
   const errors: string[] = []
   let messages = 0, leads = 0
   const channel: Channel = payload?.object === 'instagram' ? 'instagram' : 'facebook'
+  const pageId = metaEnv('META_PAGE_ID')
   for (const entry of payload?.entry ?? []) {
+    // Only the configured Facebook Page (other Pages on the app, and Meta's dashboard samples, are ignored).
+    if (channel === 'facebook' && pageId && String(entry.id) !== pageId) continue
     for (const ev of entry.messaging ?? []) {
       try {
         if (ev.message || ev.postback) { const r = await handleSocialMessage(channel, ev); if (r && !r.duplicate) messages++ }
