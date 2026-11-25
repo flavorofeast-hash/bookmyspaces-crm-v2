@@ -230,7 +230,12 @@ export async function sendSocialText(customerId: string, channel: Channel, body:
 export async function checkPage(): Promise<string> {
   const s = socialStatus()
   if (!s.pageId || !s.canFetch) throw new Error('META_PAGE_ID / META_PAGE_ACCESS_TOKEN are not set in Vercel.')
-  const p = await graph('me?fields=id') // a Page token's "me" is the Page; needs no extra permission
+  let p: any
+  try { p = await graph('me?fields=id') } catch (e) {
+    // #100 = Meta accepted the token but reading Page details needs pages_read_engagement (not needed for messaging). #190 = invalid token.
+    if ((e as any).code === '100') return 'Token accepted by Meta. Page details cannot be read without pages_read_engagement; this is not needed to receive or send messages.'
+    throw e
+  }
   if (String(p.id) !== s.pageId) throw new Error('The Page token belongs to a different Page.')
   p.name = (await graph(`${encodeURIComponent(s.pageId)}?fields=name`).catch(() => null))?.name ?? 'Page'
   const subs = await graph(`${encodeURIComponent(s.pageId)}/subscribed_apps`).catch(() => null)
