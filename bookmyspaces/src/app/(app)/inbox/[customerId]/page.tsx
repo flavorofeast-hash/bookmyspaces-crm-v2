@@ -8,6 +8,7 @@ import { WaBanner } from '@/components/wa-banner'
 import { PageHeader, Card, Flash, Badge, Hidden, Empty } from '@/components/ui'
 import { SubmitButton, QuickReplyBox } from '@/components/client'
 import { approvedInfoReply } from '@/lib/promo'
+import { replyChannel, socialWindow, socialStatus } from '@/lib/social'
 import { fmtDateTime } from '@/lib/format'
 import { formatPhone, waLink } from '@/lib/phone'
 
@@ -17,7 +18,7 @@ export default async function ThreadPage(props: { params: Promise<{ customerId: 
   await requireUser() // every page checks the session itself; the layout check alone can be skipped by client navigations
   const params = await props.params
   const searchParams = await props.searchParams
-  const c = await q1<any>(`SELECT c.id, c.name, c.phone, c.whatsapp, c.property_id, c.ai_paused, c.wa_handover_reason, p.name AS property_name, cp.code AS campaign_code FROM crm.customers c LEFT JOIN crm.properties p ON p.id = c.property_id LEFT JOIN crm.campaigns cp ON cp.id = c.campaign_id WHERE c.id = $1`, [params.customerId]).catch(() => null)
+  const c = await q1<any>(`SELECT c.id, c.name, c.phone, c.whatsapp, c.fb_psid, c.ig_sid, c.ig_username, c.property_id, c.ai_paused, c.wa_handover_reason, p.name AS property_name, cp.code AS campaign_code FROM crm.customers c LEFT JOIN crm.properties p ON p.id = c.property_id LEFT JOIN crm.campaigns cp ON cp.id = c.campaign_id WHERE c.id = $1`, [params.customerId]).catch(() => null)
   if (!c) notFound()
   const [msgs, savedReplies, templates, win, booking, propIds] = await Promise.all([
     thread(c.id), q<any>(`SELECT * FROM crm.quick_replies ORDER BY sort_order`), q<any>(`SELECT * FROM crm.wa_templates ORDER BY name`), windowOpen(c.id),
@@ -28,10 +29,14 @@ export default async function ThreadPage(props: { params: Promise<{ customerId: 
   const replies = [...(await Promise.all(propIds.map((p) => approvedInfoReply(p.id)))).filter((r): r is NonNullable<typeof r> => !!r), ...savedReplies]
   await markRead(c.id)
   const s = waStatus()
+  const channel = await replyChannel(c.id)
+  const social = channel === 'facebook' || channel === 'instagram'
+  const sWin = social ? await socialWindow(c.id, channel) : null
+  const chName = channel === 'facebook' ? 'Messenger' : channel === 'instagram' ? 'Instagram' : 'WhatsApp'
   const number = c.whatsapp ?? c.phone
   return (
     <>
-      <PageHeader title={c.name} subtitle={<>{formatPhone(number) || 'No WhatsApp number'}{c.property_name ? ` · Enquiry about ${c.property_name}` : ''}{c.campaign_code ? ` · from promotion ${c.campaign_code}` : ''}</>}
+      <PageHeader title={c.name} subtitle={<>{social ? `${chName}${c.ig_username ? ` @${c.ig_username}` : ''}${number ? ' · ' + formatPhone(number) : ''}` : formatPhone(number) || 'No WhatsApp number'}{c.property_name ? ` · Enquiry about ${c.property_name}` : ''}{c.campaign_code ? ` · from promotion ${c.campaign_code}` : ''}</>}
         actions={<>
           <Link href={`/customers/${c.id}`} className="btn-secondary btn-sm">Customer record</Link>
           <Link href={`/bookings/new?customer=${c.id}`} className="btn-primary btn-sm">Convert to booking</Link>
@@ -50,7 +55,7 @@ export default async function ThreadPage(props: { params: Promise<{ customerId: 
                 {m.media_id && m.msg_type === 'audio' && <audio controls preload="none" src={`/api/whatsapp/media/${m.id}`} className="mb-1 max-w-full" />}
                 {m.media_id && ['document', 'video', 'sticker'].includes(m.msg_type) && <a href={`/api/whatsapp/media/${m.id}`} target="_blank" rel="noreferrer" className="link text-xs block mb-1">Open {m.media_filename ?? 'file'}</a>}
                 {m.body && <div className="whitespace-pre-wrap break-words">{m.body}</div>}
-                <div className="text-[11px] muted mt-1 flex flex-wrap items-center gap-1.5">{fmtDateTime(m.created_at)}{m.direction === 'out' && (m.ai_generated ? <span className="rounded bg-violet-100 text-violet-800 px-1.5">AI reply</span> : m.is_auto_reply ? ' · auto-reply' : m.sent_by_name ? ` · ${m.sent_by_name}` : '')}{m.direction === 'out' && <Badge value={m.status} />}</div>
+                <div className="text-[11px] muted mt-1 flex flex-wrap items-center gap-1.5">{m.channel && m.channel !== 'whatsapp' && <span className="rounded bg-sky-100 text-sky-800 px-1.5">{m.channel === 'facebook' ? 'Messenger' : 'Instagram'}</span>}{fmtDateTime(m.created_at)}{m.direction === 'out' && (m.ai_generated ? <span className="rounded bg-violet-100 text-violet-800 px-1.5">AI reply</span> : m.is_auto_reply ? ' · auto-reply' : m.sent_by_name ? ` · ${m.sent_by_name}` : '')}{m.direction === 'out' && <Badge value={m.status} />}</div>
                 {m.status === 'failed' && <div className="text-xs text-red-700 mt-1">Not delivered: {m.error_message}{m.error_code ? ` (code ${m.error_code})` : ''}</div>}
               </div>
             </li>))}</ul>
@@ -61,7 +66,19 @@ export default async function ThreadPage(props: { params: Promise<{ customerId: 
         </div>
       </Card>
 
-      {s.canSend && number ? (
+      {social ? (
+        <Card title={`Reply on ${chName}`} className="mt-4">
+          {!socialStatus().canSend ? <p className="text-sm">Replies from the CRM open once the Facebook Page token is added in Vercel. Until then, reply from Meta Business Suite — those replies still appear here.</p>
+            : sWin?.open ? (
+            <form action={sendReplyAction} className="space-y-2">
+              <Hidden name="customer_id" value={c.id} /><Hidden name="channel" value={channel} />
+              <QuickReplyBox replies={replies} />
+              <SubmitButton pendingText="Sending…">Send on {chName}</SubmitButton>
+              <p className="text-xs muted">Replies are allowed until 24 hours after the customer’s last message. Promotional messages are never sent from here.</p>
+            </form>
+          ) : <p className="text-sm">More than 24 hours since the customer last wrote, so {chName} does not allow a reply from the CRM. {number ? 'Use WhatsApp or call the number on the lead.' : 'Wait for the customer to write again.'}</p>}
+        </Card>
+      ) : s.canSend && number ? (
         <Card title="Reply" className="mt-4">
           {win.open ? (<>
             <form action={sendReplyAction} className="space-y-2">

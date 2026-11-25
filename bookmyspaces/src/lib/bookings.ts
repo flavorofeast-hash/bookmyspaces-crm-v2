@@ -3,6 +3,7 @@ import { logActivity } from './activity'
 import { createCustomer, findCustomerByPhone } from './customers'
 import { istDate, istToDate, addDays } from './format'
 import { ratesFor } from './rates'
+import { convertOpenLeads } from './leads'
 
 export type Space = {
   id: string; property_id: string; property_name: string; name: string; kind: 'room' | 'hall' | 'rooftop' | 'other'
@@ -185,6 +186,7 @@ export async function createBooking(input: NewBookingInput, userId?: string | nu
       }
       await recalcBooking(id, db)
       await logActivity({ userId, customerId, bookingId: id, action: 'booking_created', detail: ref }, db)
+      await convertOpenLeads(customerId, id, db)
       if (input.confirm) await setBookingStatusInTx(db, id, 'confirmed', userId)
       else if (input.quote) await q(`UPDATE crm.bookings SET status = 'quoted' WHERE id = $1`, [id], db)
       return { id, ref }

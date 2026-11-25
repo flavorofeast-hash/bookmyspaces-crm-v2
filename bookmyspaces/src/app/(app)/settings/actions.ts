@@ -8,6 +8,7 @@ import { run, str } from '@/lib/action'
 import { q } from '@/lib/db'
 import { logActivity } from '@/lib/activity'
 import { reprocessWebhookError } from '@/lib/whatsapp'
+import { subscribePage, simulateSocial } from '@/lib/social'
 
 /** Records who changed which setting (never passwords). */
 async function audit(u: { id: string }, what: string, f?: FormData) {
@@ -86,5 +87,23 @@ export async function retryWebhookErrorAction(f: FormData) {
   await run(B + '#connections', 'Webhook delivery processed again.', async () => {
     const errs = await reprocessWebhookError(Number(str(f, 'id')), u.id)
     if (errs.length) throw new Error(`Still failing: ${errs.join('; ').slice(0, 300)}`)
+  })
+}
+
+export async function subscribePageAction() {
+  const u = await requireOwner()
+  await run(B + '#connections', 'Facebook Page connected to the CRM.', async () => {
+    const r = await subscribePage()
+    await audit(u, 'Facebook Page subscribed to webhooks')
+    return `${B}?ok=${encodeURIComponent('Page subscribed — ' + r)}#connections`
+  })
+}
+
+export async function simulateSocialAction(f: FormData) {
+  const u = await requireOwner()
+  await run(B + '#connections', 'Test message processed.', async () => {
+    const ch = str(f, 'channel') === 'instagram' ? 'instagram' : 'facebook'
+    const r = await simulateSocial(ch, str(f, 'name'), str(f, 'text'), u.id)
+    return r ? `/inbox/${r.customerId}` : undefined
   })
 }

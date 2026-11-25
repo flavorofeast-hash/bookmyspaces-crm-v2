@@ -4,9 +4,10 @@ import { q, q1, tx, type Db } from './db'
 import { normalizePhone, formatPhone } from './phone'
 import { logActivity } from './activity'
 import { aiConfigured, buildAIReply, handOver } from './wa-ai'
+import { leadFromMessage } from './leads'
 
 export function graphBase(): string {
-  return (process.env.META_GRAPH_BASE || 'https://graph.facebook.com/v21.0').replace(/\/$/, '')
+  return (process.env.META_GRAPH_BASE || 'https://graph.facebook.com/v25.0').replace(/\/$/, '')
 }
 
 export function waStatus() {
@@ -129,6 +130,7 @@ export async function handleInbound(m: WAMessage, profileName: string | null, no
       [c!.id, d.type, d.body, d.mediaId, m.id, m.timestamp ? new Date(Number(m.timestamp) * 1000) : now, d.mime ?? null, d.filename ?? null], db)
     await q(`UPDATE crm.customers SET updated_at = now() WHERE id = $1`, [c!.id], db)
     if (ins) await logActivity({ customerId: c!.id, action: 'whatsapp_in', detail: (d.body ?? `[${d.type}]`).slice(0, 140) }, db)
+    if (ins) await leadFromMessage({ customerId: c!.id, source: 'whatsapp', messageId: m.id, socialId: phone, name: profileName?.trim() || null, phone, text: d.body, propertyId, adId: m.referral?.source_id ?? null, isTest: opts.test, at: m.timestamp ? new Date(Number(m.timestamp) * 1000) : now }, db)
     return { messageId: ins?.id ?? null, customerId: c!.id, createdCustomer: created, duplicate: !ins, campaign: campaign?.code ?? null, isFirst: (prior?.n ?? 0) === 0 }
   })
 
@@ -205,6 +207,10 @@ export async function processWebhook(payload: any): Promise<{ inbound: InboundRe
   const inbound: InboundResult[] = []
   const errors: string[] = []
   let statuses = 0
+  if (payload?.object === 'page' || payload?.object === 'instagram') {
+    const { processSocialWebhook } = await import('./social')
+    return { inbound, statuses, errors: (await processSocialWebhook(payload)).errors }
+  }
   if (payload?.object !== 'whatsapp_business_account') return { inbound, statuses, errors }
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
@@ -225,7 +231,7 @@ export async function processWebhook(payload: any): Promise<{ inbound: InboundRe
 }
 
 export async function windowOpen(customerId: string, now = new Date()): Promise<{ open: boolean; lastInbound: string | null }> {
-  const r = await q1<{ last: string | null }>(`SELECT max(created_at) AS last FROM crm.messages WHERE customer_id = $1 AND direction = 'in'`, [customerId])
+  const r = await q1<{ last: string | null }>(`SELECT max(created_at) AS last FROM crm.messages WHERE customer_id = $1 AND direction = 'in' AND channel = 'whatsapp'`, [customerId])
   const last = r?.last ? new Date(r.last) : null
   return { open: Boolean(last && now.getTime() - last.getTime() < 24 * 3_600_000), lastInbound: r?.last ?? null }
 }
@@ -306,7 +312,7 @@ export async function conversations(limit = 100, search = '') {
   return q<any>(
     `SELECT c.id, c.name, c.whatsapp, c.phone, c.ai_paused, c.wa_handover_reason, p.name AS property_name, cp.code AS campaign_code,
        (SELECT b.ref FROM crm.bookings b WHERE b.customer_id = c.id ORDER BY b.created_at DESC LIMIT 1) AS booking_ref,
-       m.body AS last_body, m.msg_type AS last_type, m.direction AS last_direction, m.created_at AS last_at, m.status AS last_status, m.ai_generated AS last_ai,
+       m.body AS last_body, m.msg_type AS last_type, m.direction AS last_direction, m.created_at AS last_at, m.status AS last_status, m.ai_generated AS last_ai, m.channel AS last_channel,
        (SELECT count(*)::int FROM crm.messages u WHERE u.customer_id = c.id AND u.direction = 'in' AND NOT u.read_by_staff) AS unread
      FROM crm.customers c
      JOIN LATERAL (SELECT * FROM crm.messages mm WHERE mm.customer_id = c.id ORDER BY mm.created_at DESC LIMIT 1) m ON true

@@ -10,6 +10,7 @@ const ICONS: Record<string, string> = {
   bookings: 'M4 7h16M4 12h16M4 17h10',
   billing: 'M7 3h10l3 3v15H4V3h3zm2 6h6m-6 4h6m-6 4h4',
   inbox: 'M4 5h16v11H8l-4 4V5z',
+  leads: 'M3 4h18l-7 8v6l-4 2v-8L3 4z',
   marketing: 'M3 11l15-6v14L3 13v-2zm4 3v4a2 2 0 004 0v-3',
   rates: 'M12 3v18M17 7H9.5a3 3 0 000 6h5a3 3 0 010 6H6',
   catalogue: 'M4 6h16M4 12h16M4 18h7m5 0l2 2 4-4',
@@ -21,6 +22,7 @@ export const NAV = [
   { href: '/bookings', label: 'Bookings', icon: 'bookings' },
   { href: '/billing', label: 'Billing', icon: 'billing' },
   { href: '/inbox', label: 'Inbox', icon: 'inbox' },
+  { href: '/leads', label: 'Leads', icon: 'leads' },
   { href: '/marketing', label: 'Marketing', icon: 'marketing' },
   { href: '/catalogue', label: 'Packages & Food', icon: 'catalogue', mobileTop: true },
   { href: '/rates', label: 'Rates', icon: 'rates', mobileTop: true },
@@ -73,7 +75,7 @@ export function Nav({ unread, userName, isOwner, businessName }: { unread: numbe
       </header>
 
       {/* Mobile bottom nav */}
-      <nav className="no-print md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-slate-200 grid grid-cols-6">
+      <nav className="no-print md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-slate-200 grid grid-cols-7">
         {NAV.filter((n) => !('mobileTop' in n)).map((n) => (
           <Link key={n.href} href={n.href} className={clsx('relative flex flex-col items-center gap-0.5 py-2 text-[11px]', active(n.href) ? 'text-brand-600 font-medium' : 'text-slate-500')}>
             <Icon name={n.icon} />

@@ -8,7 +8,11 @@ export async function todayData(now = new Date()) {
   const weekEnd = istToDate(addDays(today, 8), '00:00')
   const monthStart = istToDate(today.slice(0, 8) + '01', '00:00')
 
-  const [followUps, newEnquiries, unread, checkIns, checkOuts, eventsToday, upcomingRooms, upcomingEvents, spaces, money, dueSoon, activity, quoted] = await Promise.all([
+  const [leads, followUps, newEnquiries, unread, checkIns, checkOuts, eventsToday, upcomingRooms, upcomingEvents, spaces, money, dueSoon, activity, quoted] = await Promise.all([
+    q<any>(`SELECT l.id, l.source, l.status, l.name, l.message, l.created_at, l.next_follow_up::text AS next_follow_up, c.name AS customer_name, p.name AS property_name
+            FROM crm.leads l JOIN crm.customers c ON c.id = l.customer_id LEFT JOIN crm.properties p ON p.id = l.property_id
+            WHERE NOT l.is_test AND (l.status = 'new' OR (l.status NOT IN ('converted','lost') AND l.next_follow_up <= $1::date))
+            ORDER BY (l.status = 'new') DESC, l.next_follow_up NULLS LAST, l.created_at DESC LIMIT 15`, [today]),
     q<any>(`SELECT f.*, c.name AS customer_name, c.phone, COALESCE(c.whatsapp, c.phone) AS wa FROM crm.follow_ups f JOIN crm.customers c ON c.id = f.customer_id
             WHERE f.done_at IS NULL AND f.due_on <= $1::date ORDER BY f.due_on, f.created_at LIMIT 30`, [today]),
     q<any>(`SELECT c.id, c.name, c.phone, c.source, c.created_at, c.requirements,
@@ -61,5 +65,5 @@ export async function todayData(now = new Date()) {
             FROM crm.bookings b JOIN crm.customers c ON c.id = b.customer_id LEFT JOIN crm.app_users au ON au.id = b.assigned_to
             WHERE b.status = 'quoted' AND b.end_at > now() ORDER BY b.start_at LIMIT 15`),
   ])
-  return { today, followUps, newEnquiries, unread, checkIns, checkOuts, eventsToday, upcomingRooms, upcomingEvents, spaces, money, dueSoon, activity, quoted }
+  return { today, leads, followUps, newEnquiries, unread, checkIns, checkOuts, eventsToday, upcomingRooms, upcomingEvents, spaces, money, dueSoon, activity, quoted }
 }

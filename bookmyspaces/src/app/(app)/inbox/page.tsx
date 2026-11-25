@@ -12,7 +12,7 @@ export default async function InboxPage(props: { searchParams: Promise<{ ok?: st
   const rows = await conversations(100, searchParams.q ?? '')
   return (
     <>
-      <PageHeader title="Inbox" subtitle="WhatsApp conversations. New numbers become customers automatically." />
+      <PageHeader title="Inbox" subtitle="WhatsApp, Facebook Messenger and Instagram conversations. New senders become customers and leads automatically." />
       <Flash ok={searchParams.ok} err={searchParams.err} />
       <WaBanner />
       <form className="flex gap-2 mb-3"><input name="q" defaultValue={searchParams.q ?? ''} className="input" placeholder="Search name, phone, message text or promotion code" /><button className="btn-secondary">Search</button></form>
@@ -22,7 +22,7 @@ export default async function InboxPage(props: { searchParams: Promise<{ ok?: st
             <li key={c.id}>
               <Link href={`/inbox/${c.id}`} className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2"><span className={`font-medium ${c.unread ? 'text-slate-900' : ''}`}>{c.name}</span><span className="text-xs muted">{formatPhone(c.whatsapp ?? c.phone)}</span></div>
+                  <div className="flex items-center gap-2"><span className={`font-medium ${c.unread ? 'text-slate-900' : ''}`}>{c.name}</span><span className="text-xs muted">{formatPhone(c.whatsapp ?? c.phone)}</span>{c.last_channel && c.last_channel !== 'whatsapp' && <span className="rounded-full bg-sky-100 text-sky-800 px-2 text-[11px]">{c.last_channel === 'facebook' ? 'Messenger' : 'Instagram'}</span>}</div>
                   <div className="flex flex-wrap gap-1 my-0.5 text-[11px]">
                     {c.ai_paused && <span className="rounded-full bg-amber-100 text-amber-800 px-2">Needs staff{c.wa_handover_reason ? `: ${c.wa_handover_reason}` : ''}</span>}
                     {c.property_name && <span className="rounded-full bg-slate-100 px-2">{c.property_name}</span>}

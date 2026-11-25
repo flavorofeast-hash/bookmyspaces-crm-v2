@@ -47,7 +47,7 @@ export const BOOKING_TYPE_LABEL: Record<string, string> = {
 export const SOURCE_LABEL: Record<string, string> = {
   walk_in: 'Walk-in', phone_call: 'Phone call', whatsapp: 'WhatsApp', website: 'Website', facebook: 'Facebook',
   instagram: 'Instagram', google: 'Google', referral: 'Referral', justdial: 'JustDial', campaign: 'Campaign',
-  import: 'Imported', other: 'Other',
+  import: 'Imported', other: 'Other', facebook_lead_ad: 'Facebook Lead Ad', instagram_lead_ad: 'Instagram Lead Ad',
 }
 
 export const EVENT_TYPES = [

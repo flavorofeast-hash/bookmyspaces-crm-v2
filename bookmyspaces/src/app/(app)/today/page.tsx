@@ -6,6 +6,7 @@ import { PageHeader, Card, Flash, Empty, Stat, Hidden, Badge } from '@/component
 import { SubmitButton } from '@/components/client'
 import { inr, fmtDate, fmtTime, fmtDay, fmtDateTime, SOURCE_LABEL, STATUS_LABEL } from '@/lib/format'
 import { formatPhone, waLink } from '@/lib/phone'
+import { SOURCE_LABEL as LEAD_SOURCE, STATUS_TEXT, type LeadSource } from '@/lib/leads'
 import { BookingCalendar, type CalParams } from '@/components/booking-calendar'
 
 export default async function TodayPage(props: { searchParams: Promise<{ ok?: string; err?: string } & CalParams> }) {
@@ -13,7 +14,7 @@ export default async function TodayPage(props: { searchParams: Promise<{ ok?: st
   const searchParams = await props.searchParams
   const d = await todayData()
   const free = d.spaces.filter((s) => !s.busy)
-  const attention = d.followUps.length + d.newEnquiries.length + d.unread.length + d.dueSoon.length + d.quoted.length
+  const attention = d.leads.length + d.followUps.length + d.newEnquiries.length + d.unread.length + d.dueSoon.length + d.quoted.length
   const freeBy = (kind: string) => free.filter((s) => (kind === 'room' ? s.kind === 'room' : s.kind !== 'room'))
   return (
     <>
@@ -29,6 +30,18 @@ export default async function TodayPage(props: { searchParams: Promise<{ ok?: st
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card title="Booking calendar" className="lg:col-span-2"><BookingCalendar sp={searchParams} /></Card>
+
+        <Card title={`New leads & lead follow-ups (${d.leads.length})`} actions={<Link href="/leads" className="link text-sm">All leads</Link>}>
+          {d.leads.length === 0 ? <Empty>No new leads.</Empty> : (
+            <ul className="divide-y divide-slate-100">{d.leads.map((l: any) => (
+              <li key={l.id} className="py-2 text-sm">
+                <Link href={`/leads/${l.id}`} className="link font-medium">{l.name || l.customer_name}</Link>{' '}
+                <span className="text-xs muted">{LEAD_SOURCE[l.source as LeadSource]} · {STATUS_TEXT[l.status]}{l.property_name ? ` · ${l.property_name}` : ''} · {fmtDateTime(l.created_at)}</span>
+                {l.next_follow_up && l.status !== 'new' && <span className={`block text-xs ${String(l.next_follow_up).slice(0, 10) < d.today ? 'text-red-600' : 'muted'}`}>Follow-up {fmtDate(l.next_follow_up)}</span>}
+                {l.message && <span className="block text-xs muted line-clamp-1">{l.message}</span>}
+              </li>))}</ul>
+          )}
+        </Card>
 
         <Card title={`Follow-ups due (${d.followUps.length})`}>
           {d.followUps.length === 0 ? <Empty>Nothing due. </Empty> : (

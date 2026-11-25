@@ -3,11 +3,18 @@
 import { requireUser } from '@/lib/auth'
 import { sendText, sendTemplate, sendMedia, setAiPaused } from '@/lib/whatsapp'
 import { run, str } from '@/lib/action'
+import { replyChannel, sendSocialText } from '@/lib/social'
 
 export async function sendReplyAction(f: FormData) {
   const u = await requireUser()
   const id = str(f, 'customer_id')
   await run(`/inbox/${id}`, 'Message sent.', async () => {
+    const ch = str(f, 'channel') || await replyChannel(id)
+    if (ch === 'facebook' || ch === 'instagram') {
+      const r = await sendSocialText(id, ch, str(f, 'body'), u.id)
+      if (!r.ok) throw new Error(`${ch === 'facebook' ? 'Messenger' : 'Instagram'} did not accept the message: ${r.error}`)
+      return
+    }
     const r = await sendText(id, str(f, 'body'), u.id)
     if (!r.ok) throw new Error(`WhatsApp did not accept the message: ${r.error}`)
   })

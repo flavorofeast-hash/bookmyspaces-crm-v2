@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 // Fast gate only: pages without a session cookie go to /login. The cookie's
 // signature, expiry and the user's active status are verified on the server
 // for every page (requireUser) and every action.
-const PUBLIC = ['/login', '/setup', '/d/', '/api/whatsapp/webhook', '/api/media/', '/api/health', '/logout']
+const PUBLIC = ['/login', '/setup', '/d/', '/api/whatsapp/webhook', '/api/meta/webhook', '/api/media/', '/api/health', '/logout']
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl

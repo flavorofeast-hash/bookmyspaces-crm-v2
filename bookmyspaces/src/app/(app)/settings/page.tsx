@@ -253,6 +253,7 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
               ['Database', true, 'Connected'],
               ['WhatsApp — receive messages', wa.canReceive, 'Needs WHATSAPP_APP_SECRET and WHATSAPP_WEBHOOK_VERIFY_TOKEN; webhook URL: /api/whatsapp/webhook'],
               ['WhatsApp — send replies', wa.canSend, 'Needs WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID'],
+              ['Facebook Messenger, Instagram DMs & Lead Ads — receive', env('META_PAGE_ID') && env('META_PAGE_ACCESS_TOKEN') && wa.canReceive, 'Needs META_PAGE_ID and META_PAGE_ACCESS_TOKEN (Page token with pages_messaging, instagram_manage_messages, leads_retrieval); webhook URL: /api/meta/webhook'],
               ['Facebook publishing', env('META_PAGE_ID') && env('META_PAGE_ACCESS_TOKEN'), 'Needs META_PAGE_ID and META_PAGE_ACCESS_TOKEN (connection is checked live on each post)'],
               ['Instagram publishing', env('INSTAGRAM_BUSINESS_ACCOUNT_ID') && env('META_PAGE_ACCESS_TOKEN') && env('APP_PUBLIC_URL'), 'Needs INSTAGRAM_BUSINESS_ACCOUNT_ID, META_PAGE_ACCESS_TOKEN and APP_PUBLIC_URL'],
               ['Customer document links', env('APP_PUBLIC_URL'), 'Needs APP_PUBLIC_URL (this site’s address)'],
@@ -275,6 +276,17 @@ export default async function SettingsPage(props: { searchParams: Promise<{ ok?:
             {hookErrors.length === 0 ? <p className="text-xs muted">None.</p> : <ul className="text-xs space-y-1 mt-1">{hookErrors.map((e) => (
               <li key={e.id} className="flex items-center gap-2"><span className="muted">{fmtDateTime(e.at)}</span><span className="flex-1 truncate">{e.error}</span>
                 <form action={A.retryWebhookErrorAction}><Hidden name="id" value={e.id} /><SubmitButton className="btn-secondary btn-sm">Retry</SubmitButton></form></li>))}</ul>}
+          </div>
+          <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+            <div className="font-medium text-sm">Facebook & Instagram enquiries</div>
+            <p className="text-xs muted">After the Page token is in Vercel, press this once: it asks Meta to send this Page’s messages and lead-form submissions to the CRM. Safe to press again.</p>
+            <form action={A.subscribePageAction}><SubmitButton className="btn-secondary btn-sm" pendingText="Connecting…">Connect Facebook Page</SubmitButton></form>
+            <form action={A.simulateSocialAction} className="grid sm:grid-cols-3 gap-2 items-end">
+              <Field label="Channel"><select name="channel" className="input"><option value="facebook">Facebook Messenger</option><option value="instagram">Instagram DM</option></select></Field>
+              <Field label="Customer name"><input name="name" defaultValue="ZZ TEST " className="input" required /></Field>
+              <Field label="Message" className="sm:col-span-3"><input name="text" className="input" placeholder="Hi, is the rooftop free on 12 Dec for 40 guests?" required /></Field>
+              <SubmitButton className="btn-secondary">Run test message (nothing is sent)</SubmitButton>
+            </form>
           </div>
           <div className="mt-4 pt-3 border-t border-slate-100">
             <div className="font-medium text-sm">Test an incoming WhatsApp enquiry</div>
