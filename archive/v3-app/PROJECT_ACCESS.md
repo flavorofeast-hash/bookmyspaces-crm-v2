@@ -22,7 +22,7 @@ Webhook:
 https://bookmyspaces-crm-v2.vercel.app/api/whatsapp/webhook
 
 Verify Token:
-bookmyspaces_webhook_verify_2026
+[removed — old value was public; a new token is used for V2]
 
 ## Vercel
 Project:
